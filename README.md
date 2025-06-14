@@ -29,7 +29,7 @@ admin.vm.Remove              * mgmtvm @tag:created-by-mgmtvm allow target=dom0
 qubes.Filecopy       * mgmtvm @tag:created-by-mgmtvm allow
 qubes.WaitForSession * mgmtvm @tag:created-by-mgmtvm allow
 qubes.VMShell        * mgmtvm @tag:created-by-mgmtvm allow
-qubes.VMRootShell    * mgmtvm @tag:created-by-mgmtvm allow
+qubes.VMRootShell    * mgmtvm @tag:created-by-mgmtvm allow user=root
 ```
 
 ### 4. Update Admin Local Read-Write policy
