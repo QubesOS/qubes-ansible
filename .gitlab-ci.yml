@@ -21,6 +21,8 @@ lint:
     - sudo qubes-dom0-update -y ansible python3-pytest python3-coverage perl-Digest-SHA
     # install from artifacts
     - find $CI_PROJECT_DIR/artifacts/repository -name '*.noarch.rpm' -exec sudo dnf install -y {} \+
+    # install a minimal template for tests
+    - qvm-template install --enablerepo=*testing debian-12-minimal
   script:
     # run ansible's tests
     - cd /usr/share/ansible && sudo coverage run --data-file=$CI_PROJECT_DIR/.coverage --include=plugins/modules/qubesos.py,plugins/connection/qubes.py -m pytest -vvv tests/qubes/

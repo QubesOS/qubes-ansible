@@ -45,6 +45,17 @@ def vm(qubes, request):
 
 
 @pytest.fixture(scope="function")
+def minimalvm(qubes, request):
+    vmname = f"test-minimalvm-{uuid.uuid4().hex[:8]}"
+    props = {"template": "debian-12-minimal"}
+    core(Module({"state": "present", "name": vmname, "properties": props}))
+    request.node.mark_vm_created(vmname)
+
+    qubes.domains.refresh_cache(force=True)
+    return qubes.domains[vmname]
+
+
+@pytest.fixture(scope="function")
 def netvm(qubes, request):
     vmname = f"test-netvm-{uuid.uuid4().hex[:8]}"
     props = {"provides_network": True}
