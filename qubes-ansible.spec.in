@@ -41,6 +41,7 @@ install -m 644 plugins/modules/qubesos.py %{buildroot}%{_datadir}/ansible/plugin
 install -m 644 plugins/connection/qubes.py %{buildroot}%{_datadir}/ansible/plugins/connection/qubes.py
 
 install -m 644 tests/qubes/*.py %{buildroot}%{_datadir}/ansible/tests/qubes/
+install -m 644 tests/ansible.cfg %{buildroot}%{_datadir}/ansible/tests/qubes/
 
 %files
 %doc README.md LICENSE EXAMPLES.md
@@ -49,6 +50,7 @@ install -m 644 tests/qubes/*.py %{buildroot}%{_datadir}/ansible/tests/qubes/
 
 %files tests
 %{_datadir}/ansible/tests/qubes/*.py
+%{_datadir}/ansible/tests/qubes/ansible.cfg
 
 %changelog
 @CHANGELOG@
