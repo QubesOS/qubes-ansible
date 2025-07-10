@@ -510,6 +510,112 @@ def test_per_device_mode_and_options(qubes, vmname, request, latest_net_ports):
     core(Module({"state": "absent", "name": vmname}))
 
 
+def test_strict_idempotent_sync(qubes, vmname, request, latest_net_ports):
+    request.node.mark_vm_created(vmname)
+    port = latest_net_ports[-1]
+
+    # Initial assignment of a single PCI port
+    rc, res = core(
+        Module(
+            {
+                "state": "present",
+                "name": vmname,
+                "devices": [port],
+            }
+        )
+    )
+    assert rc == VIRT_SUCCESS
+    assert res.get("changed", False)
+
+    # Re-run with the same device list (strict mode) — should be a no-op
+    rc2, res2 = core(
+        Module(
+            {
+                "state": "present",
+                "name": vmname,
+                "devices": [port],
+            }
+        )
+    )
+    assert rc2 == VIRT_SUCCESS
+    # No changes on the second sync
+    assert not res2.get("changed", False)
+
+    # Verify still exactly that one port is assigned
+    qubes.domains.refresh_cache(force=True)
+    assigned = qubes.domains[vmname].devices["pci"].get_assigned_devices()
+    ports_assigned = [
+        f"pci:dom0:{(d.virtual_device.port_id if hasattr(d, 'virtual_device') else d.port_id)}"
+        for d in assigned
+    ]
+    assert ports_assigned == [port]
+
+    # cleanup
+    core(Module({"state": "absent", "name": vmname}))
+
+
+def test_strict_unassign_all_devices(qubes, vmname, request, latest_net_ports):
+    request.node.mark_vm_created(vmname)
+    ports = latest_net_ports[-2:]
+
+    # Assign two PCI ports initially
+    rc, res = core(
+        Module(
+            {
+                "state": "present",
+                "name": vmname,
+                "devices": ports,
+            }
+        )
+    )
+    assert rc == VIRT_SUCCESS
+    assert res.get("changed", False)
+
+    qubes.domains.refresh_cache(force=True)
+    # Confirm both are there
+    initial = {
+        f"pci:dom0:{(d.virtual_device.port_id if hasattr(d, 'virtual_device') else d.port_id)}"
+        for d in qubes.domains[vmname].devices["pci"].get_assigned_devices()
+    }
+    assert initial == set(ports)
+
+    # Now sync to an empty list (strict default) to remove all devices
+    rc2, res2 = core(
+        Module(
+            {
+                "state": "present",
+                "name": vmname,
+                "devices": [],  # strict empty
+            }
+        )
+    )
+    assert rc2 == VIRT_SUCCESS
+    # Should report that it changed by removing devices
+    assert res2.get("changed", False)
+
+    # After removal, no PCI devices should remain assigned
+    qubes.domains.refresh_cache(force=True)
+    assert (
+        list(qubes.domains[vmname].devices["pci"].get_assigned_devices()) == []
+    )
+
+    # And a second empty-sync is a no-op
+    rc3, res3 = core(
+        Module(
+            {
+                "state": "present",
+                "name": vmname,
+                "devices": [],
+            }
+        )
+    )
+    assert rc3 == VIRT_SUCCESS
+    assert res3.get("changed", False) is False
+
+    # cleanup
+    core(Module({"state": "absent", "name": vmname}))
+
+
 def test_services_alias_to_features_only(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
 
