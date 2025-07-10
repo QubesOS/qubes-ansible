@@ -327,19 +327,20 @@ def test_pci_facts_match_actual_devices(qubes):
 
     # Compute the lists directly from qubes.domains["dom0"]
     net_actual = [
-        f"pci:dom0:{dev.port_id}"
+        f"pci:dom0:{dev.port_id}:{dev.device_id}"
         for dev in qubes.domains["dom0"].devices["pci"]
         if repr(dev.interfaces[0]).startswith("p02")
     ]
     usb_actual = [
-        f"pci:dom0:{dev.port_id}"
+        f"pci:dom0:{dev.port_id}:{dev.device_id}"
         for dev in qubes.domains["dom0"].devices["pci"]
         if repr(dev.interfaces[0]).startswith("p0c03")
     ]
     audio_actual = [
-        f"pci:dom0:{dev.port_id}"
+        f"pci:dom0:{dev.port_id}:{dev.device_id}"
         for dev in qubes.domains["dom0"].devices["pci"]
-        if repr(dev.interfaces[0]).startswith("p0403")
+        if repr(dev.interfaces[0]).startswith("p0401")
+        or repr(dev.interfaces[0]).startswith("p0403")
     ]
 
     # Compare sets

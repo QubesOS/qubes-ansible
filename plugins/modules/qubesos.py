@@ -285,7 +285,7 @@ class QubesVirt(object):
         """Yield the port IDs of all devices matching a given class in dom0."""
         for dev in self.app.domains["dom0"].devices["pci"]:
             if repr(dev.interfaces[0]).startswith("p" + klass):
-                yield dev.port_id
+                yield f"pci:dom0:{dev.port_id}:{dev.device_id}"
 
     def get_vm(self, vmname):
         """Retrieve a qube object by its name."""
@@ -601,7 +601,7 @@ class QubesVirt(object):
         for ass in vm.devices[devclass].get_assigned_devices():
             # get the VirtualDevice
             d = getattr(ass, "virtual_device", None) or ass.device
-            spec = f"{devclass}:{d.backend_domain}:{d.port_id}"
+            spec = f"{devclass}:{d.backend_domain}:{d.port_id}:{d.device_id}"
             mode = getattr(ass, "mode", None)
             opts = getattr(ass, "options", None) or {}
             current[spec] = (mode, opts)
@@ -623,7 +623,7 @@ class QubesVirt(object):
         """Synchronize a qube's device assignments to match the desired configuration."""
         # build desired map: spec -> (vd, per_mode, opts)
         desired_map = {
-            f"{devclass}:{vd.backend_domain}:{vd.port_id}": (
+            f"{devclass}:{vd.backend_domain}:{vd.port_id}:{vd.device_id}": (
                 vd,
                 per_mode,
                 opts or {},
@@ -751,7 +751,7 @@ def core(module):
             elif set_mode == "append":
                 current_map = v.list_assigned_devices(vmname, device_class)
                 for vd, per_mode, opts in wants:
-                    spec = f"{device_class}:{vd.backend_domain}:{vd.port_id}"
+                    spec = f"{device_class}:{vd.backend_domain}:{vd.port_id}:{vd.device_id}"
                     if spec in current_map:
                         # already present -> leave it (no mode/options change in append mode)
                         continue
@@ -772,14 +772,11 @@ def core(module):
     # gather device facts
     if module.params.get("gather_device_facts", False):
         facts = {
-            "pci_net": sorted(
-                [f"pci:dom0:{dev}" for dev in v.find_devices_of_class("02")]
-            ),
-            "pci_usb": sorted(
-                [f"pci:dom0:{dev}" for dev in v.find_devices_of_class("0c03")]
-            ),
+            "pci_net": sorted(v.find_devices_of_class("02")),
+            "pci_usb": sorted(v.find_devices_of_class("0c03")),
             "pci_audio": sorted(
-                [f"pci:dom0:{dev}" for dev in v.find_devices_of_class("0403")]
+                list(v.find_devices_of_class("0401"))
+                + list(v.find_devices_of_class("0403"))
             ),
         }
         return VIRT_SUCCESS, {"changed": False, "ansible_facts": facts}
