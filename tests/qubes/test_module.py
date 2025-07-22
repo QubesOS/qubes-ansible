@@ -159,8 +159,6 @@ def test_properties_and_tags(qubes, vmname, request):
     assert qubes.domains[vmname].autostart is True
     for t in tags:
         assert t in qubes.domains[vmname].tags
-    # cleanup
-    core(Module({"state": "absent", "name": vmname}))
 
 
 def test_invalid_property_key(qubes):
@@ -550,9 +548,6 @@ def test_strict_idempotent_sync(qubes, vmname, request, latest_net_ports):
     ]
     assert ports_assigned == [port]
 
-    # cleanup
-    core(Module({"state": "absent", "name": vmname}))
-
 
 def test_strict_unassign_all_devices(qubes, vmname, request, latest_net_ports):
     request.node.mark_vm_created(vmname)
@@ -612,9 +607,6 @@ def test_strict_unassign_all_devices(qubes, vmname, request, latest_net_ports):
     assert rc3 == VIRT_SUCCESS
     assert res3.get("changed", False) is False
 
-    # cleanup
-    core(Module({"state": "absent", "name": vmname}))
-
 
 def test_services_alias_to_features_only(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
@@ -641,9 +633,6 @@ def test_services_alias_to_features_only(qubes, vmname, request):
         key = f"service.{svc}"
         assert key in qube.features
         assert qube.features[key] == "1"
-
-    # cleanup
-    core(Module({"state": "absent", "name": vmname}))
 
 
 def test_services_and_explicit_features_combined(qubes, vmname, request):
@@ -681,9 +670,6 @@ def test_services_and_explicit_features_combined(qubes, vmname, request):
         assert key in qube.features
         assert qube.features[key] == "1"
 
-    # cleanup
-    core(Module({"state": "absent", "name": vmname}))
-
 
 def test_shutdown_with_and_without_wait(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
@@ -719,3 +705,143 @@ def test_shutdown_with_and_without_wait(qubes, vmname, request):
     assert rc == VIRT_SUCCESS
     # should already be halted, no extra sleep needed
     assert vm.is_halted()
+
+
+def test_set_kernelopts(qubes, vmname, request):
+    request.node.mark_vm_created(vmname)
+    props = {"kernelopts": "swiotlb=4096 foo=bar"}
+    rc, res = core(
+        Module(
+            {
+                "state": "present",
+                "name": vmname,
+                "properties": props,
+            }
+        )
+    )
+    assert rc == VIRT_SUCCESS
+    assert "kernelopts" in res["Properties updated"]
+    assert qubes.domains[vmname].kernelopts == "swiotlb=4096 foo=bar"
+
+
+def test_set_timeouts(qubes, vmname, request):
+    request.node.mark_vm_created(vmname)
+    props = {"qrexec_timeout": 123, "shutdown_timeout": 456}
+    rc, res = core(
+        Module(
+            {
+                "state": "present",
+                "name": vmname,
+                "properties": props,
+            }
+        )
+    )
+    assert rc == VIRT_SUCCESS
+    updated = res["Properties updated"]
+    assert "qrexec_timeout" in updated
+    assert "shutdown_timeout" in updated
+    qubes.domains.refresh_cache(force=True)
+    vm = qubes.domains[vmname]
+    assert vm.qrexec_timeout == 123
+    assert vm.shutdown_timeout == 456
+
+
+def test_set_ip_ip6_and_mac(qubes, vmname, request):
+    request.node.mark_vm_created(vmname)
+    props = {
+        "ip": "10.1.2.3",
+        "ip6": "fe80::1",
+        "mac": "00:11:22:33:44:55",
+    }
+    rc, res = core(
+        Module(
+            {
+                "state": "present",
+                "name": vmname,
+                "properties": props,
+            }
+        )
+    )
+    assert rc == VIRT_SUCCESS
+    updated = res["Properties updated"]
+    for key in ("ip", "ip6", "mac"):
+        assert key in updated
+    qubes.domains.refresh_cache(force=True)
+    vm = qubes.domains[vmname]
+    assert vm.ip == "10.1.2.3"
+    assert vm.ip6 == "fe80::1"
+    assert vm.mac == "00:11:22:33:44:55"
+
+
+def test_set_management_and_audio_vm(
+    qubes, vmname, managementdvm, audiovm, request
+):
+    request.node.mark_vm_created(vmname)
+    props = {"management_dispvm": managementdvm.name, "audiovm": audiovm.name}
+    rc, res = core(
+        Module(
+            {
+                "state": "present",
+                "name": vmname,
+                "properties": props,
+            }
+        )
+    )
+    assert rc == VIRT_SUCCESS
+    updated = res["Properties updated"]
+    assert "management_dispvm" in updated
+    assert "audiovm" in updated
+    qubes.domains.refresh_cache(force=True)
+    vm = qubes.domains[vmname]
+    assert vm.management_dispvm == managementdvm
+    assert vm.audiovm == audiovm
+
+
+def test_set_default_user_and_guivm(qubes, vmname, guivm, request):
+    request.node.mark_vm_created(vmname)
+    props = {"default_user": "alice", "guivm": guivm.name}
+    rc, res = core(
+        Module(
+            {
+                "state": "present",
+                "name": vmname,
+                "properties": props,
+            }
+        )
+    )
+    assert rc == VIRT_SUCCESS
+    updated = res["Properties updated"]
+    assert "default_user" in updated
+    assert "guivm" in updated
+    qubes.domains.refresh_cache(force=True)
+    vm = qubes.domains[vmname]
+    assert vm.default_user == "alice"
+    assert vm.guivm == guivm.name
+
+
+def test_invalid_type_for_new_properties(qubes, vmname, request):
+    request.node.mark_vm_created(vmname)
+    # ip must be str, not int
+    rc, res = core(
+        Module(
+            {
+                "state": "present",
+                "name": vmname,
+                "properties": {"ip": 12345},
+            }
+        )
+    )
+    assert rc == VIRT_FAILED
+    assert "Invalid property value type" in res
+    # qrexec_timeout must be int, not str
+    rc2, res2 = core(
+        Module(
+            {
+                "state": "present",
+                "name": vmname,
+                "properties": {"qrexec_timeout": "sixty"},
+            }
+        )
+    )
+    assert rc2 == VIRT_FAILED
+    assert "Invalid property value type" in res2

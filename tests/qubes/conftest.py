@@ -2,6 +2,7 @@ import uuid
 
 import pytest
 import qubesadmin
+from qubesadmin.utils import vm_dependencies
 
 from plugins.modules.qubesos import core
 
@@ -66,21 +67,80 @@ def netvm(qubes, request):
     return qubes.domains[vmname]
 
 
+@pytest.fixture(scope="function")
+def audiovm(qubes, request):
+    vmname = f"test-audiovm-{uuid.uuid4().hex[:8]}"
+    core(Module({"state": "present", "name": vmname}))
+    request.node.mark_vm_created(vmname)
+
+    qubes.domains.refresh_cache(force=True)
+    return qubes.domains[vmname]
+
+
+@pytest.fixture(scope="function")
+def guivm(qubes, request):
+    vmname = f"test-guivm-{uuid.uuid4().hex[:8]}"
+    core(Module({"state": "present", "name": vmname}))
+    request.node.mark_vm_created(vmname)
+
+    qubes.domains.refresh_cache(force=True)
+    return qubes.domains[vmname]
+
+
+@pytest.fixture(scope="function")
+def managementdvm(qubes, request):
+    vmname = f"test-mdvm-{uuid.uuid4().hex[:8]}"
+    core(Module({"state": "present", "name": vmname}))
+    request.node.mark_vm_created(vmname)
+
+    qubes.domains.refresh_cache(force=True)
+    return qubes.domains[vmname]
+
+
 @pytest.fixture(autouse=True)
 def cleanup_vm(qubes, request):
-    """Ensure any test VM is removed after test"""
+    """Ensure any test VM is removed after test, breaking dependencies first."""
     created = []
 
     def mark(name):
         created.append(name)
 
+    # allow tests to call request.node.mark_vm_created(vmname)
     request.node.mark_vm_created = mark
+
     yield
-    # Teardown (remove VMs)
+
+    # teardown: for each VM we created, first clear any references, then remove it
     for name in created:
+        # break inter-VM references
+        try:
+            deps = vm_dependencies(qubes, name)
+        except Exception:
+            deps = []
+
+        for holder, prop_name in deps:
+            # skip global qubes properties
+            if holder is None:
+                continue
+
+            # get current value
+            current = getattr(holder, prop_name, None)
+
+            # if it's a list, remove our VM name from it
+            if isinstance(current, list):
+                if name in current:
+                    current.remove(name)
+                    setattr(holder, prop_name, current)
+
+            # otherwise, just null it out
+            else:
+                setattr(holder, prop_name, None)
+
+        # now remove the VM itself
         try:
             core(Module({"command": "remove", "name": name}))
         except Exception:
+            # if it still fails (e.g. already gone), ignore
             pass
 
 

@@ -99,12 +99,22 @@ options:
           - debug (bool)
           - include_in_backups (bool)
           - kernel (str)
+          - kernelopts (str)
           - label (str)
           - maxmem (int)
           - memory (int)
           - provides_network (bool)
           - netvm (str)
           - default_dispvm (str)
+          - management_dispvm (str)
+          - default_user (str)
+          - guivm (str)
+          - audiovm (str)
+          - ip (str)
+          - ip6 (str)
+          - mac (str)
+          - qrexec_timeout (int)
+          - shutdown_timeout (int)
           - template (str)
           - template_for_dispvms (bool)
           - vcpus (int)
@@ -209,6 +219,7 @@ PROPS = {
     "debug": bool,
     "include_in_backups": bool,
     "kernel": str,
+    "kernelopts": str,
     "label": str,
     "maxmem": int,
     "memory": int,
@@ -218,7 +229,16 @@ PROPS = {
     "vcpus": int,
     "virt_mode": str,
     "default_dispvm": str,
+    "management_dispvm": str,
+    "default_user": str,
+    "guivm": str,
+    "audiovm": str,
     "netvm": str,
+    "ip": str,
+    "ip6": str,
+    "mac": str,
+    "qrexec_timeout": int,
+    "shutdown_timeout": int,
     "features": dict,
     "services": list,
     "volume": dict,
@@ -429,123 +449,77 @@ class QubesVirt(object):
         except KeyError:
             self.create(vmname, vmtype, label, vmtemplate)
             vm = self.get_vm(vmname)
-        if "autostart" in prefs and vm.autostart != prefs["autostart"]:
-            vm.autostart = prefs["autostart"]
-            changed = True
-            values_changed.append("autostart")
-        if "debug" in prefs and vm.debug != prefs["debug"]:
-            vm.debug = prefs["debug"]
-            changed = True
-            values_changed.append("debug")
-        if (
-            "include_in_backups" in prefs
-            and vm.include_in_backups != prefs["include_in_backups"]
-        ):
-            vm.include_in_backups = prefs["include_in_backups"]
-            changed = True
-            values_changed.append("include_in_backups")
-        if "kernel" in prefs and vm.kernel != prefs["kernel"]:
-            vm.kernel = prefs["kernel"]
-            changed = True
-            values_changed.append("kernel")
-        if "label" in prefs and vm.label.name != prefs["label"]:
-            vm.label = prefs["label"]
-            changed = True
-            values_changed.append("label")
-        if "maxmem" in prefs and vm.maxmem != prefs["maxmem"]:
-            vm.maxmem = prefs["maxmem"]
-            changed = True
-            values_changed.append("maxmem")
-        if "memory" in prefs and vm.memory != prefs["memory"]:
-            vm.memory = prefs["memory"]
-            changed = True
-            values_changed.append("memory")
-        if (
-            "provides_network" in prefs
-            and vm.provides_network != prefs["provides_network"]
-        ):
-            vm.provides_network = prefs["provides_network"]
-            changed = True
-            values_changed.append("provides_network")
-        if "netvm" in prefs:
-            # To make sure that we allow VMs with netvm
-            if prefs["netvm"] == "":
-                netvm = ""
-            elif prefs["netvm"] == "*default*":
-                netvm = self.app.default_netvm
+
+        # VM-reference properties
+        vm_ref_keys = [
+            "audiovm",
+            "default_dispvm",
+            "default_user",
+            "guivm",
+            "management_dispvm",
+            "netvm",
+            "template",
+        ]
+
+        for key, val in prefs.items():
+            if key in vm_ref_keys:
+                # determine new value or default
+                if val in (None, ""):
+                    new_val = ""
+                elif val == "*default*":
+                    new_val = qubesadmin.DEFAULT
+                else:
+                    new_val = val
+                # check and apply change
+                if new_val is qubesadmin.DEFAULT:
+                    if not vm.property_is_default(key):
+                        setattr(vm, key, new_val)
+                        changed = True
+                        values_changed.append(key)
+                else:
+                    if getattr(vm, key) != new_val:
+                        setattr(vm, key, new_val)
+                        changed = True
+                        values_changed.append(key)
+
+            elif key == "features":
+                for fkey, fval in val.items():
+                    if fval is None:
+                        if fkey in vm.features:
+                            del vm.features[fkey]
+                            changed = True
+                    else:
+                        if vm.features.get(fkey) != fval:
+                            vm.features[fkey] = fval
+                            changed = True
+                if changed and "features" not in values_changed:
+                    values_changed.append("features")
+
+            elif key == "services":
+                for svc in val:
+                    feat = f"service.{svc}"
+                    if vm.features.get(feat) != "1":
+                        vm.features[feat] = "1"
+                        changed = True
+                if changed and "features" not in values_changed:
+                    values_changed.append("features")
+
+            elif key == "volume":
+                val = prefs["volume"]
+                try:
+                    volume = vm.volumes[val["name"]]
+                    volume.resize(val["size"])
+                except Exception:
+                    return VIRT_FAILED, {"Failure in updating volume": val}
+                changed = True
+                values_changed.append("volume")
+
             else:
-                netvm = self.app.domains[prefs["netvm"]]
-            if vm.netvm != netvm:
-                vm.netvm = netvm
-                changed = True
-                values_changed.append("netvm")
-        if "default_dispvm" in prefs:
-            default_dispvm = self.app.domains[prefs["default_dispvm"]]
-            if vm.default_dispvm != default_dispvm:
-                vm.default_dispvm = default_dispvm
-                changed = True
-                values_changed.append("default_dispvm")
-        if "template" in prefs:
-            template = self.app.domains[prefs["template"]]
-            if vm.template != template:
-                vm.template = template
-                changed = True
-                values_changed.append("template")
-        if (
-            "template_for_dispvms" in prefs
-            and vm.template_for_dispvms != prefs["template_for_dispvms"]
-        ):
-            vm.template_for_dispvms = prefs["template_for_dispvms"]
-            changed = True
-            values_changed.append("template_for_dispvms")
-        if "vcpus" in prefs and vm.vcpus != prefs["vcpus"]:
-            vm.vcpus = prefs["vcpus"]
-            changed = True
-            values_changed.append("vcpus")
-        if "virt_mode" in prefs and vm.virt_mode != prefs["virt_mode"]:
-            vm.virt_mode = prefs["virt_mode"]
-            changed = True
-            values_changed.append("virt_mode")
-        if "services" in prefs:
-            did_feature_changed = False
-            for service in prefs["services"]:
-                changed = True
-                did_feature_changed = True
-                prefs.setdefault("features", {})
-                prefs["features"][f"service.{service}"] = "1"
-            if did_feature_changed:
-                values_changed.append("features")
-        if "features" in prefs:
-            did_feature_changed = False
-            for key, value in prefs["features"].items():
-                if value == "" and key in vm.features:
-                    vm.features[key] = ""
+                current = getattr(vm, key)
+                if current != val:
+                    setattr(vm, key, val)
                     changed = True
-                    did_feature_changed = True
-                elif value == "None" and key in vm.features:
-                    del vm.features[key]
-                    changed = True
-                    did_feature_changed = True
-                elif key in vm.features and value != vm.features[key]:
-                    vm.features[key] = value
-                    changed = True
-                    did_feature_changed = True
-                elif not key in vm.features and value != "None":
-                    vm.features[key] = value
-                    changed = True
-                    did_feature_changed = True
-            if did_feature_changed:
-                values_changed.append("features")
-        if "volume" in prefs:
-            val = prefs["volume"]
-            # Let us get the volume
-            try:
-                volume = vm.volumes[val["name"]]
-                volume.resize(val["size"])
-            except Exception:
-                return VIRT_FAILED, {"Failure in updating volume": val}
-            changed = True
-            values_changed.append("volume")
+                    values_changed.append(key)
 
         return changed, values_changed
 
