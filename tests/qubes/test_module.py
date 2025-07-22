@@ -5,7 +5,7 @@ from plugins.modules.qubesos import core, VIRT_SUCCESS, VIRT_FAILED
 from tests.qubes.conftest import qubes, vmname, Module
 
 
-def test_create_start_shutdown_destroy_remove(qubes, vmname, request):
+def test_lifecycle_full_create_start_shutdown_remove(qubes, vmname, request):
 
     request.node.mark_vm_created(vmname)
 
@@ -35,7 +35,7 @@ def test_create_start_shutdown_destroy_remove(qubes, vmname, request):
     assert vmname not in qubes.domains
 
 
-def test_create_and_absent(qubes, vmname, request):
+def test_lifecycle_create_and_absent(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
 
     # Create
@@ -52,7 +52,7 @@ def test_create_and_absent(qubes, vmname, request):
     assert vmname not in qubes.domains
 
 
-def test_pause_and_unpause(qubes, vmname, request):
+def test_lifecycle_pause_and_resume(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
     core(Module({"command": "create", "name": vmname, "vmtype": "AppVM"}))
     core(Module({"command": "start", "name": vmname}))
@@ -71,7 +71,7 @@ def test_pause_and_unpause(qubes, vmname, request):
     core(Module({"state": "absent", "name": vmname}))
 
 
-def test_status_command(qubes, vmname, request):
+def test_lifecycle_status_reporting(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
     core(Module({"command": "create", "name": vmname, "vmtype": "AppVM"}))
     rc, state = core(Module({"command": "status", "name": vmname}))
@@ -89,7 +89,7 @@ def test_status_command(qubes, vmname, request):
     core(Module({"state": "absent", "name": vmname}))
 
 
-def test_list_info_and_inventory(tmp_path, qubes):
+def test_inventory_generation_and_grouping(tmp_path, qubes):
     # Use a temporary directory for inventory
     os.chdir(tmp_path)
 
@@ -142,7 +142,7 @@ def test_list_info_and_inventory(tmp_path, qubes):
     assert set(standalonevms) == set(expected.get("StandaloneVM", []))
 
 
-def test_properties_and_tags(qubes, vmname, request):
+def test_properties_set_and_tag_vm(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
     props = {"autostart": True, "debug": True, "memory": 256}
     tags = ["tag1", "tag2"]
@@ -161,7 +161,7 @@ def test_properties_and_tags(qubes, vmname, request):
         assert t in qubes.domains[vmname].tags
 
 
-def test_invalid_property_key(qubes):
+def test_properties_invalid_key(qubes):
     # Unknown property should fail
     rc, res = core(
         Module(
@@ -172,7 +172,7 @@ def test_invalid_property_key(qubes):
     assert "Invalid property" in res
 
 
-def test_invalid_property_type(qubes, vmname, request):
+def test_properties_invalid_type(qubes, vmname, request):
     # Wrong type for memory
     rc, res = core(
         Module(
@@ -187,7 +187,7 @@ def test_invalid_property_type(qubes, vmname, request):
     assert "Invalid property value type" in res
 
 
-def test_missing_netvm(qubes, vmname, request):
+def test_properties_missing_netvm(qubes, vmname, request):
     # netvm does not exist
     rc, res = core(
         Module(
@@ -202,7 +202,7 @@ def test_missing_netvm(qubes, vmname, request):
     assert "Missing netvm" in res
 
 
-def test_default_netvm(qubes, vm, netvm, request):
+def test_properties_reset_to_default_netvm(qubes, vm, netvm, request):
     """
     Able to reset back to default netvm without needing to mention it by name
     """
@@ -239,7 +239,7 @@ def test_default_netvm(qubes, vm, netvm, request):
     assert qubes.domains[vm.name].netvm == default_netvm
 
 
-def test_missing_default_dispvm(qubes):
+def test_properties_missing_default_dispvm(qubes):
     # default_dispvm does not exist
     rc, res = core(
         Module(
@@ -254,7 +254,7 @@ def test_missing_default_dispvm(qubes):
     assert "Missing default_dispvm" in res
 
 
-def test_wrong_volume_name(qubes, vmname, request):
+def test_properties_invalid_volume_name_for_appvm(qubes, vmname, request):
     # volume name not allowed for AppVM
     rc, res = core(
         Module(
@@ -269,7 +269,7 @@ def test_wrong_volume_name(qubes, vmname, request):
     assert "Wrong volume name" in res
 
 
-def test_missing_volume_fields(qubes, vmname, request):
+def test_properties_missing_volume_fields(qubes, vmname, request):
     # Missing name
     rc1, res1 = core(
         Module(
@@ -297,7 +297,7 @@ def test_missing_volume_fields(qubes, vmname, request):
     assert "Missing size for the volume" in res2
 
 
-def test_removetags_without_tags(qubes, vmname, request):
+def test_removetags_errors_if_no_tags_present(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
 
     # Create
@@ -313,7 +313,7 @@ def test_removetags_without_tags(qubes, vmname, request):
     assert "Missing tag" in res.get("Error", "")
 
 
-def test_pci_facts_match_actual_devices(qubes):
+def test_devices_pci_facts_match_actual(qubes):
     # Gather PCI facts from the module
     rc, res = core(Module({"gather_device_facts": True}))
     assert rc == VIRT_SUCCESS, "Fact‐gathering should succeed"
@@ -347,7 +347,9 @@ def test_pci_facts_match_actual_devices(qubes):
     assert set(facts["pci_audio"]) == set(audio_actual)
 
 
-def test_strict_single_pci(qubes, vmname, request, latest_net_ports):
+def test_devices_strict_single_pci_assignment(
+    qubes, vmname, request, latest_net_ports
+):
     request.node.mark_vm_created(vmname)
     port = latest_net_ports[-1]
 
@@ -379,7 +381,7 @@ def test_strict_single_pci(qubes, vmname, request, latest_net_ports):
     core(Module({"state": "absent", "name": vmname}))
 
 
-def test_strict_multiple_devices_including_block(
+def test_devices_strict_multiple_with_block(
     qubes, vmname, request, latest_net_ports, block_device
 ):
     request.node.mark_vm_created(vmname)
@@ -419,7 +421,7 @@ def test_strict_multiple_devices_including_block(
     core(Module({"state": "absent", "name": vmname}))
 
 
-def test_append_strategy_adds_without_removing(
+def test_devices_append_strategy_adds_without_removal(
     qubes, vmname, request, latest_net_ports, block_device
 ):
     request.node.mark_vm_created(vmname)
@@ -474,7 +476,9 @@ def test_append_strategy_adds_without_removing(
     core(Module({"state": "absent", "name": vmname}))
 
 
-def test_per_device_mode_and_options(qubes, vmname, request, latest_net_ports):
+def test_devices_per_device_mode_and_options(
+    qubes, vmname, request, latest_net_ports
+):
     request.node.mark_vm_created(vmname)
     port = latest_net_ports[-1]
 
@@ -508,7 +512,9 @@ def test_per_device_mode_and_options(qubes, vmname, request, latest_net_ports):
     core(Module({"state": "absent", "name": vmname}))
 
 
-def test_strict_idempotent_sync(qubes, vmname, request, latest_net_ports):
+def test_devices_strict_idempotent_sync(
+    qubes, vmname, request, latest_net_ports
+):
     request.node.mark_vm_created(vmname)
     port = latest_net_ports[-1]
 
@@ -549,7 +555,7 @@ def test_strict_idempotent_sync(qubes, vmname, request, latest_net_ports):
     assert ports_assigned == [port]
 
 
-def test_strict_unassign_all_devices(qubes, vmname, request, latest_net_ports):
+def test_devices_strict_unassign_all(qubes, vmname, request, latest_net_ports):
     request.node.mark_vm_created(vmname)
     ports = latest_net_ports[-2:]
 
@@ -608,7 +614,7 @@ def test_strict_unassign_all_devices(qubes, vmname, request, latest_net_ports):
     assert res3.get("changed", False) is False
 
 
-def test_services_alias_to_features_only(qubes, vmname, request):
+def test_services_aliased_to_features_only(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
 
     services = ["clocksync", "minimal-netvm"]
@@ -671,7 +677,7 @@ def test_services_and_explicit_features_combined(qubes, vmname, request):
         assert qube.features[key] == "1"
 
 
-def test_shutdown_with_and_without_wait(qubes, vmname, request):
+def test_lifecycle_shutdown_with_and_without_wait(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
 
     # Create VM
@@ -707,7 +713,7 @@ def test_shutdown_with_and_without_wait(qubes, vmname, request):
     assert vm.is_halted()
 
 
-def test_set_kernelopts(qubes, vmname, request):
+def test_properties_set_kernelopts(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
     props = {"kernelopts": "swiotlb=4096 foo=bar"}
     rc, res = core(
@@ -724,7 +730,7 @@ def test_set_kernelopts(qubes, vmname, request):
     assert qubes.domains[vmname].kernelopts == "swiotlb=4096 foo=bar"
 
 
-def test_set_timeouts(qubes, vmname, request):
+def test_properties_set_timeouts(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
     props = {"qrexec_timeout": 123, "shutdown_timeout": 456}
     rc, res = core(
@@ -746,7 +752,7 @@ def test_set_timeouts(qubes, vmname, request):
     assert vm.shutdown_timeout == 456
 
 
-def test_set_ip_ip6_and_mac(qubes, vmname, request):
+def test_properties_set_ip_ip6_and_mac(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
     props = {
         "ip": "10.1.2.3",
@@ -773,7 +779,7 @@ def test_set_ip_ip6_and_mac(qubes, vmname, request):
     assert vm.mac == "00:11:22:33:44:55"
 
 
-def test_set_management_and_audio_vm(
+def test_properties_set_management_dispvm_and_audiovm(
     qubes, vmname, managementdvm, audiovm, request
 ):
     request.node.mark_vm_created(vmname)
@@ -797,7 +803,7 @@ def test_set_management_and_audio_vm(
     assert vm.audiovm == audiovm
 
 
-def test_set_default_user_and_guivm(qubes, vmname, guivm, request):
+def test_properties_set_default_user_and_guivm(qubes, vmname, guivm, request):
     request.node.mark_vm_created(vmname)
     props = {"default_user": "alice", "guivm": guivm.name}
     rc, res = core(
@@ -819,7 +825,7 @@ def test_set_default_user_and_guivm(qubes, vmname, guivm, request):
     assert vm.guivm == guivm.name
 
 
-def test_invalid_type_for_new_properties(qubes, vmname, request):
+def test_properties_invalid_type_for_new_properties(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
     # ip must be str, not int
     rc, res = core(
