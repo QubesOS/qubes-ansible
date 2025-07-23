@@ -440,15 +440,11 @@ class QubesVirt(object):
         vm.kill()
         return 0
 
-    def properties(self, vmname, prefs, vmtype, label, vmtemplate):
+    def properties(self, vmname, prefs):
         """Sets the given properties to the qube"""
         changed = False
         values_changed = []
-        try:
-            vm = self.get_vm(vmname)
-        except KeyError:
-            self.create(vmname, vmtype, label, vmtemplate)
-            vm = self.get_vm(vmname)
+        vm = self.get_vm(vmname)
 
         # VM-reference properties
         vm_ref_keys = [
@@ -755,6 +751,12 @@ def core(module):
         }
         return VIRT_SUCCESS, {"changed": False, "ansible_facts": facts}
 
+    if state == "present" and guest and vmtype:
+        try:
+            v.get_vm(guest)
+        except KeyError:
+            v.create(guest, vmtype, label, template)
+
     # properties will only work with state=present
     if properties:
         for key, val in properties.items():
@@ -801,9 +803,7 @@ def core(module):
                     return VIRT_FAILED, {"Missing dispvm capability": val}
 
         if state == "present" and guest and vmtype:
-            prop_changed, prop_vals = v.properties(
-                guest, properties, vmtype, label, template
-            )
+            prop_changed, prop_vals = v.properties(guest, properties)
             # Apply the tags
             tags_changed = []
             if tags:
