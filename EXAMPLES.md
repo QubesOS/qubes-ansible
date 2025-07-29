@@ -309,3 +309,73 @@ Run the above playbook using:
 ```bash
 ansible-playbook -i inventory -b shutdown_all.yaml
 ```
+
+## Clone qubes that don't have the `created-by-mgmtvm` tag ("unmanaged" qubes)
+
+Users commonly need to clone qubes that don't have the `created-by-mgmtvm` tag, like templates they install through `qvm-template`, ("unmanaged" qubes). However, `mgmtvm` didn't create these qubes, so `mgmtvm` shouldn't be able to modify them.
+
+The `90-admin-default` policy doesn't allow source qubes to clone target qubes through `include/admin-local-ro`. This include file also allows more RPCs than strictly necessary to clone target qubes.
+
+The same policy, `90-admin-default`, allows source qubes to clone target qubes through `include/admin-global-rwx`, but it also allows sources to modify targets.
+
+Instead of adding unmanaged qubes to `include/admin-local-rwx` (literally or by setting the `created-by-mgmtvm` tag on them), create a new policy file to allow the exact set of RPCs that source qubes need to clone target qubes.
+
+First, create a new include file at `/etc/qubes/policy.d/include/admin-clone` that lists the qubes that `mgmtvm` should be able to clone, but not modify:
+```
+# This is just an example. List any qubes you want to clone as targets.
+mgmtvm fedora-41-minimal allow target=dom0
+mgmtvm fedora-41-xfce    allow target=dom0
+mgmtvm debian-12-minimal allow target=dom0
+mgmtvm debian-12-xfce    allow target=dom0
+```
+
+Users can use any target qube specifier in the include file. However, if users add `@tag:TemplateVM` as a target to this list, `mgmtvm` could clone any template on the system, including templates that were cloned manually or by another management qube. It's safest to use literal qube names or custom tags (`@tag:cloneable-by-mgmtvm`, for example) as target specifiers in the include file.
+
+Create a new policy file at `/etc/qubes/policy.d/30-admin-clone.policy`:
+```
+!include-service admin.vm.List               * include/admin-clone
+!include-service admin.vm.volume.List        * include/admin-clone
+!include-service admin.vm.volume.Info        * include/admin-clone
+!include-service admin.vm.property.List      * include/admin-clone
+!include-service admin.vm.property.Get       * include/admin-clone
+!include-service admin.vm.property.GetAll    * include/admin-clone
+!include-service admin.vm.tag.List           * include/admin-clone
+!include-service admin.volume.CloneFrom      * include/admin-clone
+!include-service admin.feature.List          * include/admin-clone
+!include-service admin.feature.Get           * include/admin-clone
+!include-service admin.firewall.Get          * include/admin-clone
+!include-service admin.device.block.List     * include/admin-clone
+!include-service admin.device.mic.List       * include/admin-clone
+!include-service admin.device.pci.List       * include/admin-clone
+!include-service admin.device.testclass.List * include/admin-clone
+```
+
+This clones the `template` qube to the `guest` qube as a TemplateVM:
+```yaml
+---
+- hosts: localhost
+  connection: local
+  tasks:
+      - name: Clone fedora-41-xfce template
+        qubesos:
+          guest: fedora-41-xfce-clone
+          vmtype: "TemplateVM"
+          state: present
+          template: "fedora-41-xfce"
+```
+
+This creates `guest` as a standalone qube from the `template`:
+```yaml
+---
+- hosts: localhost
+  connection: local
+  tasks:
+      - name: Clone fedora-41-xfce template
+        qubesos:
+          guest: fedora-41-xfce-standalone
+          vmtype: "StandaloneVM"
+          state: present
+          template: "fedora-41-xfce"
+```
+
+The resulting qubes will not have appmenu entries since the [Admin API doesn't support it](https://github.com/QubesOS/qubes-issues/issues/4809). Users can generate appmenus entries manually from `dom0` or the qube settings GUI.
