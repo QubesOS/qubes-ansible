@@ -424,7 +424,9 @@ class QubesVirt(object):
             )
             vm.netvm = network_vm
         elif vmtype in ["StandaloneVM", "TemplateVM"] and template_vm:
-            vm = self.app.clone_vm(template_vm, vmname, vmtype, ignore_devices=True)
+            vm = self.app.clone_vm(
+                template_vm, vmname, vmtype, ignore_devices=True
+            )
             vm.label = label
         return 0
 
@@ -506,7 +508,9 @@ class QubesVirt(object):
                         volume = vm.volumes[vol["name"]]
                         volume.resize(vol["size"])
                     except Exception:
-                        return VIRT_FAILED, {"Failure in updating volume": vol["name"]}
+                        return VIRT_FAILED, {
+                            "Failure in updating volume": vol["name"]
+                        }
                     changed = True
                     values_changed.append(f"volume:{vol["name"]}")
 
@@ -786,13 +790,24 @@ def core(module):
                 for vol in val:
                     try:
                         if "name" not in vol:
-                            return VIRT_FAILED, {"Missing name for the volume": vol}
+                            return VIRT_FAILED, {
+                                "Missing name for the volume": vol
+                            }
                         if "size" not in vol:
-                            return VIRT_FAILED, {"Missing size for the volume": vol}
+                            return VIRT_FAILED, {
+                                "Missing size for the volume": vol
+                            }
                         if not vol["name"] in ["root", "private"]:
-                            return VIRT_FAILED, {"Wrong volume name": vol["name"]}
-                        if vol["name"] == "root" and vmtype not in ["TemplateVM", "StandaloneVM"]:
-                            return VIRT_FAILED, {f"Cannot change root volume size for '{vmtype}'"}
+                            return VIRT_FAILED, {
+                                "Wrong volume name": vol["name"]
+                            }
+                        if vol["name"] == "root" and vmtype not in [
+                            "TemplateVM",
+                            "StandaloneVM",
+                        ]:
+                            return VIRT_FAILED, {
+                                f"Cannot change root volume size for '{vmtype}'"
+                            }
                     except KeyError:
                         return VIRT_FAILED, {"Invalid volume provided": vol}
 
