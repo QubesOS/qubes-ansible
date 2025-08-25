@@ -405,7 +405,7 @@ class QubesVirt(object):
     def create(
         self,
         vmname,
-        vmtype="AppVM",
+        vmtype,
         label="red",
         template=None,
         netvm="*default*",
@@ -661,7 +661,7 @@ def core(module):
     state = module.params.get("state", None)
     guest = module.params.get("name", None)
     command = module.params.get("command", None)
-    vmtype = module.params.get("vmtype", "AppVM")
+    vmtype = module.params.get("vmtype", None)
     label = module.params.get("label", "red")
     template = module.params.get("template", None)
     properties = module.params.get("properties", {})
@@ -751,10 +751,13 @@ def core(module):
         }
         return VIRT_SUCCESS, {"changed": False, "ansible_facts": facts}
 
-    if state == "present" and guest and vmtype:
+    if state == "present" and guest:
         try:
-            v.get_vm(guest)
+            vm = v.get_vm(guest)
+            vmtype = vm.klass
         except KeyError:
+            # Set default vmtype to AppVM if vmtype is not provided
+            vmtype = vmtype or "AppVM"
             v.create(guest, vmtype, label, template)
 
     # properties will only work with state=present
