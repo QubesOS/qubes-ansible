@@ -25,6 +25,8 @@ Requires:      %{name}
 %description dom0
 This package contains the qubes_proxy ansible strategy plugin allowing to run
 Ansible playbooks on dom0 securely by proxifying plays execution on disposables.
+Note that this package edits /etc/ansible/ansible.cfg to set qubes_proxy as the
+default strategy.
 
 
 %package tests
@@ -55,15 +57,24 @@ rm -rf %{buildroot}
 %{__mkdir} -p %{buildroot}%{_datadir}/ansible/plugins/strategy
 %{__mkdir} -p %{buildroot}%{_datadir}/ansible/tests/qubes
 %{__mkdir} -p %{buildroot}%{_sysconfdir}/qubes-rpc/
+%{__mkdir} -p %{buildroot}/usr/lib/qubes/
 
 # Install the qubesos module and qubes connection plugin
 install -m 644 plugins/modules/qubesos.py %{buildroot}%{_datadir}/ansible/plugins/modules/qubesos.py
 install -m 644 plugins/connection/qubes.py %{buildroot}%{_datadir}/ansible/plugins/connection/qubes.py
 install -m 644 plugins/strategy/qubes_proxy.py %{buildroot}%{_datadir}/ansible/plugins/strategy/qubes_proxy.py
 install -m 755 qubes-rpc/qubes.AnsibleVM %{buildroot}%{_sysconfdir}/qubes-rpc/qubes.AnsibleVM
+install -m 755 update-ansible-default-strategy %{buildroot}/usr/lib/qubes/update-ansible-default-strategy
 
 install -m 644 tests/qubes/*.py %{buildroot}%{_datadir}/ansible/tests/qubes/
 install -m 644 tests/ansible.cfg %{buildroot}%{_datadir}/ansible/tests/qubes/
+
+%post dom0
+/usr/lib/qubes/update-ansible-default-strategy
+
+%triggerin dom0 -- ansible
+/usr/lib/qubes/update-ansible-default-strategy
+
 
 %files
 %doc README.md LICENSE EXAMPLES.md
@@ -72,6 +83,7 @@ install -m 644 tests/ansible.cfg %{buildroot}%{_datadir}/ansible/tests/qubes/
 
 %files dom0
 %{_datadir}/ansible/plugins/strategy/qubes_proxy.py
+/usr/lib/qubes/update-ansible-default-strategy
 
 %files tests
 %{_datadir}/ansible/tests/qubes/*.py
