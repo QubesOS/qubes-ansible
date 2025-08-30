@@ -1,60 +1,49 @@
-# Ansible Connection and Module for QubesOS
+# Ansible plugins for QubesOS
 
-This project provides an Ansible connection plugin to interact with [Qubes OS](https://qubes-os.org) virtual machines called `qubes` and an Ansible module to manage the state of your qubes.
-The `qubesos` module is under active development, so the syntax and keywords may change in future releases.
+This project provides Ansible plugins to interact and manage your [Qubes OS](https://qubes-os.org) virtual machines (called `qubes`).
+Those plugins are under active development, so the syntax and keywords may change in future releases. Contributions and feedback are welcome!
 
-## Qubes OS Management and RPC policies setup
+## Plugins description
 
-This guide explains how to leverage Qubes OS management and RPC policies by using a dedicated management qube (hereafter referred to as `mgmtvm`).
-This setup enables you to run playbooks that create and manage new qubes.
+### ``qubesos`` module
 
-### 1. Install required package
+This module may be used to interact with the QubesOS API to manage the state 
+of your qubes. You can use it to create, update, remove, restart your qubes as
+well as change their properties.
 
-- Ensure that the template used for `mgmtvm` has the `qubes-core-admin-client` and `qubes-ansible` packages installed.
-- Set up your dedicated management qube (`mgmtvm`) and configure it as needed.
+### ``qubes`` connection plugin
 
-### 2. Create and customize the management qube
+This connection plugin allows Ansible to connect to your qubes using the
+[QubesOS qrexec framework](https://www.qubes-os.org/doc/qrexec/).
 
-Create your management qube (`mgmtvm`) and customize it according to your preferences.
+### ``qubes_proxy`` strategy plugin
 
-### 3. Define RPC policies
+This strategy plugin must be used when Ansible is running on dom0 to prevent any
+security issue. The plugin acts as a router which will proxify play execution for a 
+given qube into its management disposable VM.
 
-Create a policy file at `/etc/qubes/policy.d/30-ansible.policy` with the following content:
-```
-admin.vm.Create.AppVM        * mgmtvm dom0                   allow
-admin.vm.Create.StandaloneVM * mgmtvm dom0                   allow
-admin.vm.Create.TemplateVM   * mgmtvm dom0                   allow
-admin.vm.Remove              * mgmtvm @tag:created-by-mgmtvm allow target=dom0
+Using this plugin ensures dom0 isolation from untrusted Ansible data (see https://github.com/QubesOS/qubes-issues/issues/10030).
 
-qubes.Filecopy       * mgmtvm @tag:created-by-mgmtvm allow
-qubes.WaitForSession * mgmtvm @tag:created-by-mgmtvm allow
-qubes.VMShell        * mgmtvm @tag:created-by-mgmtvm allow
-qubes.VMRootShell    * mgmtvm @tag:created-by-mgmtvm allow
-```
+__NOTE__ - this strategy is set as the default on dom0.
 
-### 4. Update Admin Local Read-Write policy
+## Installation
 
-Append the following lines to `/etc/qubes/policy.d/include/admin-local-rwx`:
-```
-mgmtvm @tag:created-by-mgmtvm allow target=dom0
-mgmtvm mgmtvm                 allow target=dom0
-```
+### AdminVM (dom0)
 
-### 5. Update Admin Global Read-Only policy
+Install the following package: ``qubes-ansible-dom0``
 
-Append the following lines to `/etc/qubes/policy.d/include/admin-global-ro`:
-```
-mgmtvm @adminvm               allow target=dom0
-mgmtvm @tag:created-by-mgmtvm allow target=dom0
-mgmtvm mgmtvm                 allow target=dom0
-```
+### Management DVM
 
-### Important notes
+The package ``qubes-ansible-vm`` must be installed on templates used by your qubes management DVM 
+(``default-mgmt-dvm`` by default).
 
-- The suffix number `30` in the policy file name (`30-ansible.policy`) is arbitrary. You can use a different number as long as it does not conflict with existing files.
-- The `created-by-*` tag pattern is used internally to identify which management qube (other than `dom0`) created a qube.
+## Usage
 
-## Examples
+``qubes`` and ``qubes_proxy`` plugins work out of the box when installed using 
+RPM. The strategy plugin will read the value of the ``hosts`` field 
+in your playbooks and:
+  - run the play locally when ``localhost`` is present in the list (dom0 management / ``qubesos`` module usage)
+  - proxify play execution through the target disposable management VM that will automatically use the ``qubes`` connection plugin to run the tasks on the target
 
 See the [examples](EXAMPLES.md) for sample playbooks and role tasks demonstrating common usage scenarios.
 
