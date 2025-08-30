@@ -1,0 +1,31 @@
+#!/bin/bash
+
+read -r tar_file
+read -r dst_host
+ansible_args=()
+for i in $(seq 100); do
+  [[ $i == 100 ]] && exit 1
+  read -r item
+  [[ -z "$item" ]] && break
+  ansible_args+=("$item")
+done
+
+temp_dir="$(mktemp -d)"
+
+# shellcheck disable=SC2064
+trap "rm -rf '$temp_dir'" EXIT
+
+tar_file_path="/home/user/QubesIncoming/dom0/${tar_file}"
+[ -f "$tar_file_path" ] || exit 1
+
+tar -C "$temp_dir" -xf "$tar_file_path"
+
+cat << EOF > "${temp_dir}/inventory"
+[appvms]
+${dst_host}
+
+[appvms:vars]
+ansible_connection=qubes
+EOF
+
+ANSIBLE_FORCE_COLOR=True ansible-playbook -i "${temp_dir}/inventory" "${ansible_args[@]}" "${temp_dir}/playbook.yaml"

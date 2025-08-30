@@ -17,28 +17,50 @@ to manage QubesOS virtual machines. The files are installed into the Ansible mod
 Ansible can automatically discover and use them. This package is intended to be installed in dom0
 (or a management qube).
 
+
+%package dom0
+Summary:       qubes_proxy ansible strategy to run ansible on dom0 securely
+Requires:      %{name}
+
+%description dom0
+This package contains the qubes_proxy ansible strategy plugin allowing to run
+Ansible playbooks on dom0 securely by proxifying plays execution on disposables.
+
+
 %package tests
-Summary:    Tests for the module and the connection
-Requires:   %{name}
-Requires:   python3-pytest
+Summary:       Tests for the module and the connection
+Requires:      %{name}
+Requires:      python3-pytest
 
 %description tests
 Tests for the module and the connection.
 
+
+%package  vm
+Summary:       qubes-ansible RPC script to run ansible on a disposable VM
+Requires:      %{name}
+
+%description vm
+qubes-ansible RPC script to run ansible on a disposable VM
+
+
 %prep
 %autosetup
 
-%build
 
 %install
 rm -rf %{buildroot}
 %{__mkdir} -p %{buildroot}%{_datadir}/ansible/plugins/modules
 %{__mkdir} -p %{buildroot}%{_datadir}/ansible/plugins/connection
+%{__mkdir} -p %{buildroot}%{_datadir}/ansible/plugins/strategy
 %{__mkdir} -p %{buildroot}%{_datadir}/ansible/tests/qubes
+%{__mkdir} -p %{buildroot}%{_sysconfdir}/qubes-rpc/
 
 # Install the qubesos module and qubes connection plugin
 install -m 644 plugins/modules/qubesos.py %{buildroot}%{_datadir}/ansible/plugins/modules/qubesos.py
 install -m 644 plugins/connection/qubes.py %{buildroot}%{_datadir}/ansible/plugins/connection/qubes.py
+install -m 644 plugins/strategy/qubes_proxy.py %{buildroot}%{_datadir}/ansible/plugins/strategy/qubes_proxy.py
+install -m 755 qubes-rpc/qubes.AnsibleVM %{buildroot}%{_sysconfdir}/qubes-rpc/qubes.AnsibleVM
 
 install -m 644 tests/qubes/*.py %{buildroot}%{_datadir}/ansible/tests/qubes/
 install -m 644 tests/ansible.cfg %{buildroot}%{_datadir}/ansible/tests/qubes/
@@ -48,9 +70,17 @@ install -m 644 tests/ansible.cfg %{buildroot}%{_datadir}/ansible/tests/qubes/
 %{_datadir}/ansible/plugins/modules/qubesos.py
 %{_datadir}/ansible/plugins/connection/qubes.py
 
+%files dom0
+%{_datadir}/ansible/plugins/strategy/qubes_proxy.py
+
 %files tests
 %{_datadir}/ansible/tests/qubes/*.py
 %{_datadir}/ansible/tests/qubes/ansible.cfg
+
+
+%files vm
+%{_sysconfdir}/qubes-rpc/qubes.AnsibleVM
+
 
 %changelog
 @CHANGELOG@
