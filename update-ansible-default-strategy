@@ -1,0 +1,24 @@
+#!/usr/bin/python3
+
+import configparser
+import shutil
+
+from pathlib import Path
+
+CONFIG_FILE = Path("/etc/ansible/ansible.cfg")
+CONFIG_FILE.touch()
+c = configparser.ConfigParser(allow_no_value=True)
+c.read(CONFIG_FILE)
+
+current_val = None
+try:
+    current_val = c.get("defaults", "strategy")
+except configparser.NoSectionError:
+    c.add_section("defaults")
+except configparser.NoOptionError:
+    pass
+
+if current_val != "qubes_proxy":
+    c.set("defaults", "strategy", "qubes_proxy")
+    shutil.copy(CONFIG_FILE, CONFIG_FILE.parent / (CONFIG_FILE.name + ".rpmsave"))
+    c.write(CONFIG_FILE.open("w"))
