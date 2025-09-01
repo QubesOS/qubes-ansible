@@ -1,0 +1,5 @@
+qubes-ansible-vm (1.2.0-1) unstable; urgency=medium
+
+  * Initial release
+
+  -- Guillaume Chinal <guiiix@invisiblethingslab.com>  Mon, 1 Sep 2025 00:13:54 +0200

@@ -1,0 +1,3 @@
+/etc/qubes-rpc/qubes.AnsibleVM
+/usr/share/ansible/plugins/modules/qubesos.py
+/usr/share/ansible/plugins/connection/qubes.py

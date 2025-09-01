@@ -1,0 +1,11 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/default.mk
+export DESTDIR=$(shell pwd)/debian/tmp
+
+%:
+	dh $@
+
+override_dh_auto_install:
+	make install-common
+	make install-vm
