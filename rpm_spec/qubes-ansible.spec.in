@@ -11,6 +11,8 @@ Source0:    %{name}-%{version}.tar.gz
 Requires:   ansible
 Requires:   qubes-core-admin-client
 
+BuildRequires: make
+
 %description
 qubes-ansible provides an Ansible connection plugin ("qubes") and an Ansible module ("qubesos")
 to manage QubesOS virtual machines. The files are installed into the Ansible module directory so that
