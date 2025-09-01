@@ -6,3 +6,9 @@ vm:
   rpm:
     build:
     - qubes-ansible.spec
+  deb:
+    build:
+    - debian
+  archlinux:
+    build:
+    - archlinux
