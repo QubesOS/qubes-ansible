@@ -51,25 +51,7 @@ qubes-ansible RPC script to run ansible on a disposable VM
 
 
 %install
-rm -rf %{buildroot}
-%{__mkdir} -p %{buildroot}%{_datadir}/ansible/plugins/modules
-%{__mkdir} -p %{buildroot}%{_datadir}/ansible/plugins/callback
-%{__mkdir} -p %{buildroot}%{_datadir}/ansible/plugins/connection
-%{__mkdir} -p %{buildroot}%{_datadir}/ansible/plugins/strategy
-%{__mkdir} -p %{buildroot}%{_datadir}/ansible/tests/qubes
-%{__mkdir} -p %{buildroot}%{_sysconfdir}/qubes-rpc/
-%{__mkdir} -p %{buildroot}/usr/lib/qubes/
-
-# Install the qubesos module and qubes connection plugin
-install -m 644 plugins/modules/qubesos.py %{buildroot}%{_datadir}/ansible/plugins/modules/qubesos.py
-install -m 644 plugins/callback/qubesos_strategy_guard.py %{buildroot}%{_datadir}/ansible/plugins/callback/qubesos_strategy_guard.py
-install -m 644 plugins/connection/qubes.py %{buildroot}%{_datadir}/ansible/plugins/connection/qubes.py
-install -m 644 plugins/strategy/qubes_proxy.py %{buildroot}%{_datadir}/ansible/plugins/strategy/qubes_proxy.py
-install -m 755 qubes-rpc/qubes.AnsibleVM %{buildroot}%{_sysconfdir}/qubes-rpc/qubes.AnsibleVM
-install -m 755 update-ansible-default-strategy %{buildroot}/usr/lib/qubes/update-ansible-default-strategy
-
-install -m 644 tests/qubes/*.py %{buildroot}%{_datadir}/ansible/tests/qubes/
-install -m 644 tests/ansible.cfg %{buildroot}%{_datadir}/ansible/tests/qubes/
+make DESTDIR=$RPM_BUILD_ROOT install-all
 
 %post dom0
 /usr/lib/qubes/update-ansible-default-strategy
