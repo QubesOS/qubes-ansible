@@ -1,0 +1,18 @@
+pkgname=qubes-ansible-vm
+pkgver=@VERSION@
+pkgrel=@REL@
+arch=(any)
+pkgdesc="qubes-ansible RPC script to run Ansible on a disposable VM"
+url="https://www.qubes-os.org/"
+license=(GPL3)
+makedepends=(git)
+depends=(ansible)
+_pkgnvr="${pkgname}-${pkgver}-${pkgrel}"
+source=("${_pkgnvr}.tar.gz")
+sha256sums=(SKIP)
+
+package() {
+    cd "${_pkgnvr}"
+    make install-common DESTDIR="$pkgdir/"
+    make install-vm DESTDIR="$pkgdir/"
+}

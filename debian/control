@@ -1,0 +1,15 @@
+Source: qubes-ansible-vm
+Section: admin
+Priority: optional
+Maintainer: Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>
+Standards-Version: 4.7.0
+Build-Depends: debhelper-compat (= 13)
+Homepage: https://www.qubes-os.org/
+
+Package: qubes-ansible-vm
+Architecture: any
+Depends:
+ ansible,
+ ${python3:Depends},
+ ${misc:Depends}
+Description: qubes-ansible RPC script to run Ansible on a disposable VM
