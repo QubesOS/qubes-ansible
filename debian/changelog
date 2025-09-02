@@ -1,5 +1,20 @@
+qubes-ansible-vm (1.2.1-1) unstable; urgency=medium
+
+  [ Marek Marczykowski-Górecki ]
+  * ci: add VM jobs
+
+  [ Guillaume Chinal ]
+  * update builder config for debian and arch
+  * use makefile
+  * debian packaging
+  * archlinux packaging
+  * rpm in rpm_spec dir
+  * add make as buildrequires
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Tue, 02 Sep 2025 12:28:53 +0200
+
 qubes-ansible-vm (1.2.0-1) unstable; urgency=medium
 
   * Initial release
 
-  -- Guillaume Chinal <guiiix@invisiblethingslab.com>  Mon, 1 Sep 2025 00:13:54 +0200
+ -- Guillaume Chinal <guiiix@invisiblethingslab.com>  Mon, 1 Sep 2025 00:13:54 +0200
