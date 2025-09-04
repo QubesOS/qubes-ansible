@@ -367,7 +367,7 @@ class QubesPlayExecutor:
                 label=self.vm.management_dispvm.label,
                 name=self.dispvm_mgmt_name,
             )
-            dispvm.features["internal"] = False
+            dispvm.features["internal"] = True
             dispvm.features["gui"] = False
             dispvm.netvm = None
             dispvm.auto_cleanup = True
