@@ -99,7 +99,7 @@ def test_volumes_list_for_standalonevm(qubes, vmname, request):
                 "state": "present",
                 "name": vmname,
                 "vmtype": "StandaloneVM",
-                "template": "debian-12-xfce",
+                "template": "debian-13-xfce",
                 "properties": {
                     "volumes": [
                         {"name": "root", "size": 32212254720},
@@ -143,7 +143,7 @@ def test_inventory_generation_and_grouping(tmp_path, qubes):
                 "command": "create",
                 "name": "teststandalone",
                 "vmtype": "StandaloneVM",
-                "template": "debian-12-xfce",
+                "template": "debian-13-xfce",
             }
         )
     )
