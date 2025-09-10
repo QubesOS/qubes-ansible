@@ -135,24 +135,23 @@ class QubesPlayExecutor:
         """
         group_vars_dir = self.temp_dir / "group_vars"
         group_vars_dir.mkdir()
-        for group_name, group in self.inventory.groups.items():
-            if self.host in group.get_hosts():
-                group_vars = {}
-                for inventory_source in self.inventory._sources:
-                    for (
-                        variable_name,
-                        variable_value,
-                    ) in self.vars_plugin.get_vars(
-                        self.loader, inventory_source, group
-                    ).items():
-                        group_vars[
-                            self.ansible_to_native(variable_name)
-                        ] = self.ansible_to_native(variable_value)
-                if group_vars:
-                    with open(
-                        group_vars_dir / f"{group_name}.yaml", "w"
-                    ) as group_vars_file:
-                        yaml.safe_dump(group_vars, group_vars_file)
+        group_vars = {}
+        for group in self.host.get_groups():
+            for inventory_source in self.inventory._sources:
+                for (
+                    variable_name,
+                    variable_value,
+                ) in self.vars_plugin.get_vars(
+                    self.loader, inventory_source, group
+                ).items():
+                    group_vars[
+                        self.ansible_to_native(variable_name)
+                    ] = self.ansible_to_native(variable_value)
+            if group_vars:
+                with open(
+                    group_vars_dir / f"{group.name}.yaml", "w"
+                ) as group_vars_file:
+                    yaml.safe_dump(group_vars, group_vars_file)
 
     def _add_host_vars(self):
         """Build host variables files
