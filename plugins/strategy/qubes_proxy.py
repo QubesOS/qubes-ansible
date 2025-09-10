@@ -36,6 +36,7 @@ from ansible.executor.play_iterator import PlayIterator
 from ansible.plugins.strategy.linear import StrategyModule as LinearStrategyModule
 from ansible.utils.display import Display
 from ansible.plugins.vars.host_group_vars import VarsModule
+from ansible.parsing.dataloader import DataLoader
 from ansible.parsing.yaml.objects import AnsibleBaseYAMLObject
 
 
@@ -100,6 +101,8 @@ class QubesPlayExecutor:
         self.app = qubesadmin.Qubes()
         self.host = iterator._play.hosts[0]
         self.loader = play_context._loader
+        if self.loader == None:
+            self.loader = DataLoader()
         self.inventory = iterator._variable_manager._inventory
         self.iterator = iterator
         self.play = iterator._play
