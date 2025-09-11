@@ -20,12 +20,4 @@ tar_file_path="/home/user/QubesIncoming/dom0/${tar_file}"
 
 tar -C "$temp_dir" -xf "$tar_file_path"
 
-cat << EOF > "${temp_dir}/inventory"
-[appvms]
-${dst_host}
-
-[appvms:vars]
-ansible_connection=qubes
-EOF
-
-ANSIBLE_FORCE_COLOR=True ansible-playbook -i "${temp_dir}/inventory" "${ansible_args[@]}" "${temp_dir}/playbook.yaml"
+ANSIBLE_FORCE_COLOR=True ansible-playbook "${ansible_args[@]}" "${temp_dir}/playbook.yaml"

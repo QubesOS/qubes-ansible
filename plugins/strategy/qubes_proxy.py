@@ -206,6 +206,31 @@ class QubesPlayExecutor:
         with playbook_chunk_path.open("w") as playbook_chunk_file:
             yaml.safe_dump([play_yaml], playbook_chunk_file)
 
+    def _add_inventory(self):
+        """Build pseudo inventory for DispVM
+        
+            This allows to use the correct group assignments from group_vars in the DispVM
+        """
+
+        inventory_data = ""
+        default_ansible_groups =  ["all", "ungrouped"]
+        
+        for group in self.host.get_groups():
+            if group.name in default_ansible_groups:
+                continue
+            
+            # create Inventory entry per group (other vars from inventory are not supported yet)
+            inventory_data += f"[{group.name}]\n{self.host}\n\n[{group.name}:vars]\nansible_connection=qubes\n\n"
+
+        # if no group assignment, fallback to default appvms
+        if not inventory_data:
+            inventory_data = f"[appvms]\n{self.host}\n\n[appvms:vars]\nansible_connection=qubes\n\n"
+
+        with open(
+            self.temp_dir / "inventory", "w"
+        ) as inventory_file:
+            inventory_file.write(inventory_data)
+
     def _add_roles(self, play):
         """Adds play role
 
@@ -391,8 +416,10 @@ class QubesPlayExecutor:
             self._add_roles(self.play)
             self._add_host_vars()
             self._add_group_vars()
+            self._add_inventory()
             tar_file_path = self._build_tar()
             ansible_args = self._build_ansible_args()
+            ansible_args += ["-i", f"{self.temp_dir}/inventory"]
 
             self.vvv(
                 f"Copying {tar_file_path} to {self.vm}")
