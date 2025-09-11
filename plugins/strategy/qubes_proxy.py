@@ -37,7 +37,7 @@ from ansible.plugins.strategy.linear import StrategyModule as LinearStrategyModu
 from ansible.utils.display import Display
 from ansible.plugins.vars.host_group_vars import VarsModule
 from ansible.parsing.dataloader import DataLoader
-from ansible.parsing.yaml.objects import AnsibleBaseYAMLObject
+from ansible.parsing.yaml.dumper import AnsibleDumper
 
 
 display = Display()
@@ -135,23 +135,21 @@ class QubesPlayExecutor:
         """
         group_vars_dir = self.temp_dir / "group_vars"
         group_vars_dir.mkdir()
-        group_vars = {}
+
         for group in self.host.get_groups():
+            group_vars = {}
             for inventory_source in self.inventory._sources:
-                for (
-                    variable_name,
-                    variable_value,
-                ) in self.vars_plugin.get_vars(
-                    self.loader, inventory_source, group
-                ).items():
-                    group_vars[
-                        self.ansible_to_native(variable_name)
-                    ] = self.ansible_to_native(variable_value)
+                group_vars.update(
+                    self.vars_plugin.get_vars(
+                        self.loader, inventory_source, group
+                    )
+                )
+
             if group_vars:
                 with open(
                     group_vars_dir / f"{group.name}.yaml", "w"
                 ) as group_vars_file:
-                    yaml.safe_dump(group_vars, group_vars_file)
+                    yaml.dump(group_vars, group_vars_file, Dumper=AnsibleDumper, default_flow_style=False)
 
     def _add_host_vars(self):
         """Build host variables files
@@ -166,25 +164,22 @@ class QubesPlayExecutor:
         host_vars_file_path = (
             host_vars_dir / f"{self.host_name}.yaml"
         )
-        with open(host_vars_file_path, "w") as host_vars_file:
-            host_vars = {}
-            for inventory_source in self.inventory._sources:
-                for (
-                    variable_name,
-                    variable_value,
-                ) in self.vars_plugin.get_vars(
+
+        host_vars = {}
+        for inventory_source in self.inventory._sources:
+            host_vars.update(
+                self.vars_plugin.get_vars(
                     self.loader, inventory_source, self.host
-                ).items():
-                    host_vars[
-                        self.ansible_to_native(variable_name)
-                    ] = self.ansible_to_native(variable_value)
-            # We add extra variables here
-            for (
-                variable_name,
-                variable_value,
-            ) in self.variable_manager.extra_vars.items():
-                host_vars[variable_name] = variable_value
-            yaml.safe_dump(host_vars, host_vars_file)
+                )
+            )
+        # We add extra variables here
+        host_vars.update(
+            self.variable_manager.extra_vars
+        )
+
+        if host_vars:
+            with open(host_vars_file_path, "w") as host_vars_file:
+                yaml.dump(host_vars, host_vars_file, Dumper=AnsibleDumper, default_flow_style=False)
 
     def _add_play(self, play):
         """Builds the playbook that will be executed on DispVM
@@ -377,12 +372,6 @@ class QubesPlayExecutor:
         if not dispvm.is_running():
             dispvm.start()
         return dispvm
-
-    @staticmethod
-    def ansible_to_native(var):
-        if isinstance(var, AnsibleBaseYAMLObject):
-            return var.__class__.__bases__[1](var)
-        return var
 
     def run(self):
         """Runs the given play on the mgmt dispvm of the host"""
