@@ -419,9 +419,14 @@ class QubesVirt(object):
         else:
             network_vm = self.get_vm(netvm)
         if vmtype == "AppVM":
-            vm = self.app.add_new_vm(
-                vmtype, vmname, label, template=template_vm
-            )
+            if self.get_vm(template_vm)._klass != "AppVM":
+                vm = self.app.add_new_vm(
+                    vmtype, vmname, label, template=template_vm
+                )
+            else:
+                self.app.clone_vm(
+                    template_vm, vmname, vmtype, ignore_devices=True
+                )
             vm.netvm = network_vm
         elif vmtype in ["StandaloneVM", "TemplateVM"] and template_vm:
             vm = self.app.clone_vm(
