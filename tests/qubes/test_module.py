@@ -88,6 +88,73 @@ def test_lifecycle_status_reporting(qubes, vmname, request):
 
     core(Module({"state": "absent", "name": vmname}))
 
+def test_create_clone_vmtype_combinations(qubes, vmname, request):
+    request.node.mark_vm_created(vmname)
+
+    # Test creating / cloning from AppVM
+    core(Module({"command": "create", "name": vmname, "vmtype": "AppVM"}))
+    rc, _ = core(Module({"command": "create", "name": f"{vmname}-clone-appvm", "template": vmname, "vmtype": "AppVM"}))
+
+    assert rc == VIRT_SUCCESS
+    assert f"{vmname}-clone-appvm" in qubes.domains
+
+    #rc, _ = core(Module({"command": "create", "name": f"{vmname}-clone-templatevm", "template": vmname, "vmtype": "TemplateVM"}))
+    #assert rc == VIRT_SUCCESS
+    #assert f"{vmname}-clone-templatevm" in qubes.domains
+
+    #rc, _ = core(Module({"command": "create", "name": f"{vmname}-clone-standalonevm", "template": vmname, "vmtype": "StandaloneVM"}))
+    #assert rc == VIRT_SUCCESS
+    #assert f"{vmname}-clone-standalonevm" in qubes.domains
+
+    # Cleanup
+    core(Module({"state": "absent", "name": f"{vmname}-clone-appvm"}))
+    #core(Module({"state": "absent", "name": f"{vmname}-clone-templatevm"}))
+    #core(Module({"state": "absent", "name": f"{vmname}-clone-standalonevm"}))
+    core(Module({"state": "absent", "name": vmname}))
+
+    # Test creating / cloning from TemplateVM
+    core(Module({"command": "create", "name": vmname, "vmtype": "TemplateVM"}))
+    rc, _ = core(Module({"command": "create", "name": f"{vmname}-clone-appvm", "template": vmname, "vmtype": "AppVM"}))
+    
+    assert rc == VIRT_SUCCESS
+    assert f"{vmname}-clone-appvm" in qubes.domains
+    # 
+    # rc, _ = core(Module({"command": "create", "name": f"{vmname}-clone-templatevm", "template": vmname, "vmtype": "TemplateVM"}))
+    # 
+    # assert rc == VIRT_SUCCESS
+    # assert f"{vmname}-clone-templatevm" in qubes.domains
+    # 
+    # rc, _ = core(Module({"command": "create", "name": f"{vmname}-clone-standalonevm", "template": vmname, "vmtype": "StandaloneVM"}))
+    # 
+    # assert rc == VIRT_SUCCESS
+    # assert f"{vmname}-clone-standalonevm" in qubes.domains
+    # 
+    # Cleanup
+    core(Module({"state": "absent", "name": f"{vmname}-clone-appvm"}))
+    # core(Module({"state": "absent", "name": f"{vmname}-clone-templatevm"}))
+    # core(Module({"state": "absent", "name": f"{vmname}-clone-standalonevm"}))
+    core(Module({"state": "absent", "name": vmname}))
+    # 
+    # # Test creating / cloning from StandaloneVM
+    # core(Module({"command": "create", "name": vmname, "vmtype": "StandaloneVM"}))
+    # rc, _ = core(Module({"command": "create", "name": f"{vmname}-clone-appvm", "template": vmname, "vmtype": "AppVM"}))
+    # assert rc == VIRT_SUCCESS
+    # assert f"{vmname}-clone-appvm" in qubes.domains
+    # 
+    # rc, _ = core(Module({"command": "create", "name": f"{vmname}-clone-templatevm", "template": vmname, "vmtype": "TemplateVM"}))
+    # assert rc == VIRT_SUCCESS
+    # assert f"{vmname}-clone-templatevm" in qubes.domains
+    # 
+    # rc, _ = core(Module({"command": "create", "name": f"{vmname}-clone-standalonevm", "template": vmname, "vmtype": "StandaloneVM"}))
+    # assert rc == VIRT_SUCCESS
+    # assert f"{vmname}-clone-standalonevm" in qubes.domains
+    # 
+    # # Cleanup
+    # core(Module({"state": "absent", "name": f"{vmname}-clone-appvm"}))
+    # core(Module({"state": "absent", "name": f"{vmname}-clone-templatevm"}))
+    # core(Module({"state": "absent", "name": f"{vmname}-clone-standalonevm"}))
+    # core(Module({"state": "absent", "name": vmname}))
+
 
 def test_volumes_list_for_standalonevm(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
