@@ -424,7 +424,7 @@ class QubesVirt(object):
                     vmtype, vmname, label, template=template_vm
                 )
             else:
-                self.app.clone_vm(
+                vm = self.app.clone_vm(
                     template_vm, vmname, vmtype, ignore_devices=True
                 )
             vm.netvm = network_vm
