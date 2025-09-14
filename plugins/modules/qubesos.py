@@ -419,7 +419,7 @@ class QubesVirt(object):
         else:
             network_vm = self.get_vm(netvm)
         if vmtype == "AppVM":
-            if self.get_vm(template_vm)._klass != "AppVM":
+            if template_vm == "" or self.get_vm(template_vm)._klass != "AppVM":
                 vm = self.app.add_new_vm(
                     vmtype, vmname, label, template=template_vm
                 )
