@@ -419,7 +419,6 @@ class QubesPlayExecutor:
             self._add_inventory()
             tar_file_path = self._build_tar()
             ansible_args = self._build_ansible_args()
-            ansible_args += ["-i", f"{self.temp_dir}/inventory"]
 
             self.vvv(
                 f"Copying {tar_file_path} to {self.vm}")
