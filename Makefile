@@ -17,7 +17,7 @@ install-dom0:
 install-tests:
 	mkdir -p $(DESTDIR)/usr/share/ansible/tests/qubes
 	install -m 644 tests/qubes/*.py $(DESTDIR)/usr/share/ansible/tests/qubes/
-	install -m 644 tests/ansible.cfg $(DESTDIR)/usr/share/ansible/tests/qubes/
+	install -m 644 tests/*.cfg $(DESTDIR)/usr/share/ansible/tests/
 
 install-vm:
 	mkdir -p $(DESTDIR)/etc/qubes-rpc/
