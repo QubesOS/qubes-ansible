@@ -33,7 +33,9 @@ import yaml
 
 from ansible import context
 from ansible.executor.play_iterator import PlayIterator
-from ansible.plugins.strategy.linear import StrategyModule as LinearStrategyModule
+from ansible.plugins.strategy.linear import (
+    StrategyModule as LinearStrategyModule,
+)
 from ansible.utils.display import Display
 from ansible.plugins.vars.host_group_vars import VarsModule
 from ansible.parsing.dataloader import DataLoader
@@ -67,17 +69,19 @@ def filter_control_chars(text: bytes):
 
         # Allow setting foreground colors
         if (
-                # starts with ESC [ ends with m
-                text[:2] == b"\x1b[" and text[6:7] == b"m" and
-
-                # normal (0), bold (1)
-                text[2] in (0x30, 0x31) and
-
-                # comma
-                text[3] == 0x3B and
-
-                # 30-37
-                text[4] == 0x33 and 0x30 <= text[5] <= 0x37
+            # starts with ESC [ ends with m
+            text[:2] == b"\x1b["
+            and text[6:7] == b"m"
+            and
+            # normal (0), bold (1)
+            text[2] in (0x30, 0x31)
+            and
+            # comma
+            text[3] == 0x3B
+            and
+            # 30-37
+            text[4] == 0x33
+            and 0x30 <= text[5] <= 0x37
         ):
             new_buff += text[:7]
             text = text[7:]
@@ -85,8 +89,13 @@ def filter_control_chars(text: bytes):
 
         # Filter other control chars
         current_byte = text[:1]
-        if b"\040" <= current_byte <= b"\176" or \
-                current_byte in (b"\a", b"\b", b"\n", b"\r", b"\t"):
+        if b"\040" <= current_byte <= b"\176" or current_byte in (
+            b"\a",
+            b"\b",
+            b"\n",
+            b"\r",
+            b"\t",
+        ):
             new_buff += current_byte
         else:
             new_buff += b"_"
@@ -116,9 +125,7 @@ class QubesPlayExecutor:
         else:
             self.host_name = self.host.name
         self.temp_dir = Path(
-            tempfile.TemporaryDirectory(
-                prefix="qubes-ansible-"
-            ).name
+            tempfile.TemporaryDirectory(prefix="qubes-ansible-").name
         )
         self.vars_plugin = VarsModule()
         self.vm = None
@@ -130,8 +137,8 @@ class QubesPlayExecutor:
     def _add_group_vars(self):
         """Build group variables files
 
-           Dumps group variables this host belongs to using vars plugin and
-           write them to group_vars/<group>.yaml
+        Dumps group variables this host belongs to using vars plugin and
+        write them to group_vars/<group>.yaml
         """
         group_vars_dir = self.temp_dir / "group_vars"
         group_vars_dir.mkdir()
@@ -149,21 +156,24 @@ class QubesPlayExecutor:
                 with open(
                     group_vars_dir / f"{group.name}.yaml", "w"
                 ) as group_vars_file:
-                    yaml.dump(group_vars, group_vars_file, Dumper=AnsibleDumper, default_flow_style=False)
+                    yaml.dump(
+                        group_vars,
+                        group_vars_file,
+                        Dumper=AnsibleDumper,
+                        default_flow_style=False,
+                    )
 
     def _add_host_vars(self):
         """Build host variables files
 
-           We're building a file in host_vars/<host>.yaml containing current
-           host variables. This is done using vars plugin.
+        We're building a file in host_vars/<host>.yaml containing current
+        host variables. This is done using vars plugin.
 
-           Extra variables (`-e` option) are also added to this file
+        Extra variables (`-e` option) are also added to this file
         """
         host_vars_dir = self.temp_dir / "host_vars"
         host_vars_dir.mkdir()
-        host_vars_file_path = (
-            host_vars_dir / f"{self.host_name}.yaml"
-        )
+        host_vars_file_path = host_vars_dir / f"{self.host_name}.yaml"
 
         host_vars = {}
         for inventory_source in self.inventory._sources:
@@ -173,33 +183,34 @@ class QubesPlayExecutor:
                 )
             )
         # We add extra variables here
-        host_vars.update(
-            self.variable_manager.extra_vars
-        )
+        host_vars.update(self.variable_manager.extra_vars)
 
         if host_vars:
             with open(host_vars_file_path, "w") as host_vars_file:
-                yaml.dump(host_vars, host_vars_file, Dumper=AnsibleDumper, default_flow_style=False)
+                yaml.dump(
+                    host_vars,
+                    host_vars_file,
+                    Dumper=AnsibleDumper,
+                    default_flow_style=False,
+                )
 
     def _add_play(self, play):
         """Builds the playbook that will be executed on DispVM
 
-           :param play: current Play object
+        :param play: current Play object
 
-           We need to build a YAML file containing only the current play that
-           will be passed to the disposable VM.
+        We need to build a YAML file containing only the current play that
+        will be passed to the disposable VM.
 
-           `get_path` method from Ansible Play object is very useful for
-           our needs as this returns the path to the file containing the play
-           and the line at which it is declared.
+        `get_path` method from Ansible Play object is very useful for
+        our needs as this returns the path to the file containing the play
+        and the line at which it is declared.
 
-           We just have to parse this YAML file starting from that line to get
-           the list of remaining plays and keep only the next one (i.e. first
-           of the list).
+        We just have to parse this YAML file starting from that line to get
+        the list of remaining plays and keep only the next one (i.e. first
+        of the list).
         """
-        play_yaml = self._get_first_play_yaml(
-            *play.get_path().split(":")
-        )
+        play_yaml = self._get_first_play_yaml(*play.get_path().split(":"))
         play_yaml["hosts"] = [self.host_name]
         play_yaml["strategy"] = "linear"
         playbook_chunk_path = self.temp_dir / "playbook.yaml"
@@ -208,17 +219,17 @@ class QubesPlayExecutor:
 
     def _add_inventory(self):
         """Build pseudo inventory for DispVM
-        
-            This allows to use the correct group assignments from group_vars in the DispVM
+
+        This allows to use the correct group assignments from group_vars in the DispVM
         """
 
         inventory_data = ""
-        default_ansible_groups =  ["all", "ungrouped"]
-        
+        default_ansible_groups = ["all", "ungrouped"]
+
         for group in self.host.get_groups():
             if group.name in default_ansible_groups:
                 continue
-            
+
             # create Inventory entry per group (other vars from inventory are not supported yet)
             inventory_data += f"[{group.name}]\n{self.host}\n\n[{group.name}:vars]\nansible_connection=qubes\n\n"
 
@@ -226,32 +237,28 @@ class QubesPlayExecutor:
         if not inventory_data:
             inventory_data = f"[appvms]\n{self.host}\n\n[appvms:vars]\nansible_connection=qubes\n\n"
 
-        with open(
-            self.temp_dir / "inventory", "w"
-        ) as inventory_file:
+        with open(self.temp_dir / "inventory", "w") as inventory_file:
             inventory_file.write(inventory_data)
 
     def _add_roles(self, play):
         """Adds play role
 
-           :param play: current Play object
+        :param play: current Play object
 
-           We are using `get_roles` method from Ansible internal Play object
-           to check if there are associated roles to the current play.
-           If so, we can get the path to every roles directory using
-           `get_role_path` method.
+        We are using `get_roles` method from Ansible internal Play object
+        to check if there are associated roles to the current play.
+        If so, we can get the path to every roles directory using
+        `get_role_path` method.
 
-           Then, we just have to copy every role in a destination "roles"
-           folder
+        Then, we just have to copy every role in a destination "roles"
+        folder
         """
         dest_roles_path = self.temp_dir / "roles"
         dest_roles_path.mkdir()
 
         for role in play.get_roles():
             role_path = Path(role.get_role_path())
-            shutil.copytree(
-                role_path, dest_roles_path / role_path.name
-            )
+            shutil.copytree(role_path, dest_roles_path / role_path.name)
 
     def _add_rpc_policies(self):
         src = self.dispvm_mgmt_name
@@ -296,16 +303,16 @@ class QubesPlayExecutor:
         args = []
         current_args = context.CLIARGS
 
-        verbosity = current_args.get('verbosity')
+        verbosity = current_args.get("verbosity")
         if verbosity:
             args.append(f"-{'v'*display.verbosity}")
 
-        tags = current_args.get('tags')
+        tags = current_args.get("tags")
         if tags:
             for tag in tags:
                 args += ["-t", tag]
 
-        skip_tags = current_args.get('skip_tags')
+        skip_tags = current_args.get("skip_tags")
         if skip_tags:
             for tag in skip_tags:
                 args += ["--skip-tags", tag]
@@ -317,9 +324,7 @@ class QubesPlayExecutor:
         return args
 
     def _build_tar(self):
-        tar_file_path = (
-            self.temp_dir.parent / f"{self.temp_dir.name}.tar"
-        )
+        tar_file_path = self.temp_dir.parent / f"{self.temp_dir.name}.tar"
         old_path = os.getcwd()
         os.chdir(self.temp_dir)
         with tarfile.open(tar_file_path, "w") as tar_file:
@@ -331,9 +336,7 @@ class QubesPlayExecutor:
     def _get_first_play_yaml(path, start_line):
         with open(path, "r") as playbook_file:
             return yaml.safe_load(
-                "".join(
-                    playbook_file.readlines()[int(start_line) - 1 :]
-                )
+                "".join(playbook_file.readlines()[int(start_line) - 1 :])
             )[0]
 
     def _remove_rpc_policies(self):
@@ -381,8 +384,7 @@ class QubesPlayExecutor:
         dispvm = self.app.domains.get(self.dispvm_mgmt_name)
         self.vvv(f"Found dispvm: {dispvm}")
         if dispvm is None:
-            self.vvv(
-                f"Creating dispvm {self.dispvm_mgmt_name}")
+            self.vvv(f"Creating dispvm {self.dispvm_mgmt_name}")
             dispvm = self.app.add_new_vm(
                 "DispVM",
                 template=self.vm.management_dispvm,
@@ -420,8 +422,7 @@ class QubesPlayExecutor:
             tar_file_path = self._build_tar()
             ansible_args = self._build_ansible_args()
 
-            self.vvv(
-                f"Copying {tar_file_path} to {self.vm}")
+            self.vvv(f"Copying {tar_file_path} to {self.vm}")
             dispvm.run_service(
                 "qubes.Filecopy",
                 localcmd="/usr/lib/qubes/qfile-dom0-agent {}".format(
@@ -429,28 +430,29 @@ class QubesPlayExecutor:
                 ),
             ).wait()
 
-            self.vvv(
-                f"Running qubes.AnsibleVM on {self.vm}")
+            self.vvv(f"Running qubes.AnsibleVM on {self.vm}")
             p = dispvm.run_service("qubes.AnsibleVM")
             rpc_args = (
-                    tar_file_path.name
-                    + "\n"
-                    + self.host_name
-                    + "\n"
-                    + "\n".join(ansible_args)
-                    + "\n"
+                tar_file_path.name
+                + "\n"
+                + self.host_name
+                + "\n"
+                + "\n".join(ansible_args)
+                + "\n"
             ).encode()
             self.vvvv(f"RPC args: {rpc_args}")
             (untrusted_stdout, untrusted_stderr) = p.communicate(rpc_args)
             self.vvvv(f"stdout: {untrusted_stdout}")
             self.vvvv(f"stderr: {untrusted_stderr}")
             self.vvvv(f"return code: {p.returncode}")
-            return (self.host,
-                    p.returncode,
-                    filter_control_chars(untrusted_stdout).decode("utf-8"),
-                    filter_control_chars(untrusted_stderr).decode("utf-8"),
-                    self.dispvm_mgmt_name,
-                    self.play.name)
+            return (
+                self.host,
+                p.returncode,
+                filter_control_chars(untrusted_stdout).decode("utf-8"),
+                filter_control_chars(untrusted_stderr).decode("utf-8"),
+                self.dispvm_mgmt_name,
+                self.play.name,
+            )
 
         finally:
             self._remove_rpc_policies()
@@ -488,11 +490,7 @@ class StrategyModule(LinearStrategyModule):
         super().__init__(*args, **kwargs)
         self._setup_rpc_policies()
 
-    def _new_play_iterator_with_hosts(
-            self,
-            iterator,
-            play_context,
-            hosts):
+    def _new_play_iterator_with_hosts(self, iterator, play_context, hosts):
         new_play = iterator._play.copy()
         new_play.hosts = hosts
         return PlayIterator(
@@ -501,15 +499,16 @@ class StrategyModule(LinearStrategyModule):
             play_context=play_context,
             variable_manager=self._variable_manager,
             all_vars=self._variable_manager.get_vars(play=new_play),
-            start_at_done=self._tqm._start_at_done
+            start_at_done=self._tqm._start_at_done,
         )
 
     @staticmethod
     def _setup_rpc_policies():
         Path(RPC_INCLUDE_POL_FILE).touch()
         for policy_file in RPC_SYS_POLICY_FILES:
-            policy_lines = [line.strip() for line in
-                            policy_file.read_text().split("\n")]
+            policy_lines = [
+                line.strip() for line in policy_file.read_text().split("\n")
+            ]
             if "!include include/qubes-ansible" not in policy_lines:
                 with policy_file.open("a") as policy_fd:
                     policy_fd.write("!include include/qubes-ansible\n")
@@ -518,14 +517,15 @@ class StrategyModule(LinearStrategyModule):
     def collect_error(error):
         display.display(f"[ERROR]: {str(error)}", "red")
         display.display(
-            ''.join(traceback.format_exception(None, error, error.__traceback__))
-            , "red")
+            "".join(
+                traceback.format_exception(None, error, error.__traceback__)
+            ),
+            "red",
+        )
 
     def collect_result(self, result_tuple):
         host, retcode, stdout, stderr, dispvm, play_name = result_tuple
-        display.banner(
-            f"QUBESOS [{dispvm}: PLAY {play_name}]"
-        )
+        display.banner(f"QUBESOS [{dispvm}: PLAY {play_name}]")
         if stderr:
             display.display(str(stderr), "red")
         if stdout:
@@ -535,8 +535,8 @@ class StrategyModule(LinearStrategyModule):
     def proxy_run(self, iterator, play_context):
         play = iterator._play
         display.vvv(
-            f"<QubesOS> Running play {play} "
-            f"with {self._tqm._forks} forks")
+            f"<QubesOS> Running play {play} " f"with {self._tqm._forks} forks"
+        )
         pool = multiprocessing.Pool(self._tqm._forks)
 
         self.qubes_results = {}
@@ -544,7 +544,8 @@ class StrategyModule(LinearStrategyModule):
             self.qubes_results[host] = 255
 
             new_iterator = self._new_play_iterator_with_hosts(
-                iterator, play_context, [host])
+                iterator, play_context, [host]
+            )
             pool.apply_async(
                 run_play_executor,
                 (new_iterator, play_context),
@@ -567,25 +568,31 @@ class StrategyModule(LinearStrategyModule):
         play = iterator._play
 
         target_hosts = self._inventory.get_hosts(play.hosts)
-        local_hosts = [host for host in target_hosts if host.name == "localhost"]
+        local_hosts = [
+            host for host in target_hosts if host.name == "localhost"
+        ]
         retval_local_exec = self._tqm.RUN_OK
 
-        remote_hosts = [host for host in target_hosts if host.name != "localhost"]
+        remote_hosts = [
+            host for host in target_hosts if host.name != "localhost"
+        ]
         retval_remote_exec = self._tqm.RUN_OK
 
         if local_hosts:
             retval_local_exec = super().run(
                 self._new_play_iterator_with_hosts(
-                    iterator, play_context, local_hosts),
-                play_context
+                    iterator, play_context, local_hosts
+                ),
+                play_context,
             )
 
         # For other host, we need to start a disp mgmt and run the play inside
         if remote_hosts:
             retval_remote_exec = self.proxy_run(
                 self._new_play_iterator_with_hosts(
-                    iterator, play_context, remote_hosts),
-                play_context
+                    iterator, play_context, remote_hosts
+                ),
+                play_context,
             )
 
         return max(retval_local_exec, retval_remote_exec)

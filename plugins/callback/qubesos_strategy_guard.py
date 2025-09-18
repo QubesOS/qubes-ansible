@@ -20,8 +20,8 @@ from ansible.plugins.callback import CallbackBase
 
 class CallbackModule(CallbackBase):
     CALLBACK_VERSION = 2.0
-    CALLBACK_TYPE = 'notification'
-    CALLBACK_NAME = 'qubesos_strategy_guard'
+    CALLBACK_TYPE = "notification"
+    CALLBACK_NAME = "qubesos_strategy_guard"
 
     def v2_playbook_on_play_start(self, play):
         self._play = play
@@ -34,15 +34,16 @@ class CallbackModule(CallbackBase):
             return
 
         task_connection = task._variable_manager.get_vars(
-                play=self._play,
-                host=host,
-                task=task,
-                include_hostvars=True,
-                include_delegate_to=True
-        ).get('ansible_connection')
+            play=self._play,
+            host=host,
+            task=task,
+            include_hostvars=True,
+            include_delegate_to=True,
+        ).get("ansible_connection")
 
         if task_connection == "qubes":
             self._display.warning(
                 "Using qubes connection plugin without qubes_proxy strategy is "
                 "considered insecure and may lead to dom0 compromise. Continue "
-                "at your own risk.")
+                "at your own risk."
+            )
