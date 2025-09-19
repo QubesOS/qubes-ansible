@@ -1,3 +1,26 @@
+qubes-ansible-vm (1.2.2-1) unstable; urgency=medium
+
+  [ Guillaume Chinal ]
+  * update tests to use debian-13-xfce
+
+  [ TheVamp ]
+  * fix group_vars crash using DataLoader as default
+  * optimize group_vars loop
+  * use AnsibleDumper to create host_vars and group_vars files
+  * generate inventory for DispVM dynamic
+  * move inventory args to qubes.AnsibleVM
+  * fix for cloning AppVM with AppVM as Template
+  * fix to pass tests
+  * add test cases for create/cloning based on vmtype combinations
+  * add missing assignment
+  * simplify condition
+  * fix tests
+
+  [ Marek Marczykowski-Górecki ]
+  * Format with black
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Fri, 19 Sep 2025 03:18:25 +0200
+
 qubes-ansible-vm (1.2.1-1) unstable; urgency=medium
 
   [ Marek Marczykowski-Górecki ]
