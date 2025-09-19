@@ -237,7 +237,12 @@ class QubesPlayExecutor:
         play_yaml["strategy"] = "linear"
         playbook_chunk_path = self.temp_dir / "playbook.yaml"
         with playbook_chunk_path.open("w") as playbook_chunk_file:
-            yaml.safe_dump([play_yaml], playbook_chunk_file)
+            yaml.dump(
+                [play_yaml],
+                playbook_chunk_file,
+                Dumper=AnsibleDumper,
+                default_flow_style=False,
+            )
 
     def _add_inventory(self):
         """Build pseudo inventory for DispVM
