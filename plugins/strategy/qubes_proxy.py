@@ -117,6 +117,7 @@ class QubesPlayExecutor:
         self.play = iterator._play
         self.play_context = play_context
         self.variable_manager = iterator._variable_manager
+        self.variable_manager._loader = self.loader
 
         self.dispvm_initially_running = False
 
@@ -134,61 +135,82 @@ class QubesPlayExecutor:
     def dispvm_mgmt_name(self):
         return f"disp-mgmt-{self.host_name}"[:DISPVM_NAME_MAXLEN]
 
-    def _add_group_vars(self):
-        """Build group variables files
-
-        Dumps group variables this host belongs to using vars plugin and
-        write them to group_vars/<group>.yaml
-        """
-        group_vars_dir = self.temp_dir / "group_vars"
-        group_vars_dir.mkdir()
-
-        for group in self.host.get_groups():
-            group_vars = {}
-            for inventory_source in self.inventory._sources:
-                group_vars.update(
-                    self.vars_plugin.get_vars(
-                        self.loader, inventory_source, group
-                    )
-                )
-
-            if group_vars:
-                with open(
-                    group_vars_dir / f"{group.name}.yaml", "w"
-                ) as group_vars_file:
-                    yaml.dump(
-                        group_vars,
-                        group_vars_file,
-                        Dumper=AnsibleDumper,
-                        default_flow_style=False,
-                    )
-
     def _add_host_vars(self):
         """Build host variables files
 
         We're building a file in host_vars/<host>.yaml containing current
-        host variables. This is done using vars plugin.
-
-        Extra variables (`-e` option) are also added to this file
+        host variables merged from all sources (inventory, group_vars,
+        host_vars, extra_vars...). This is done using the variable manager.
         """
         host_vars_dir = self.temp_dir / "host_vars"
         host_vars_dir.mkdir()
         host_vars_file_path = host_vars_dir / f"{self.host_name}.yaml"
 
-        host_vars = {}
-        for inventory_source in self.inventory._sources:
-            host_vars.update(
-                self.vars_plugin.get_vars(
-                    self.loader, inventory_source, self.host
-                )
-            )
-        # We add extra variables here
-        host_vars.update(self.variable_manager.extra_vars)
+        # We get all variable associated to the current host/play
+        # merged from all sources
+        all_vars = self.variable_manager.get_vars(
+            play=self.play, host=self.host, include_hostvars=True
+        )
 
-        if host_vars:
+        # In those vars, we got magic vars. This should not be problematic
+        # as Ansible is supposed to ignore them, but we will try to remove
+        # them
+        # https://docs.ansible.com/ansible/latest/reference_appendices/special_variables.html
+        filtered_vars = set(
+            self.variable_manager._get_magic_variables(
+                play=self.play, host=self.host, task=None, include_hostvars=True
+            ).keys()
+        ) | {
+            "ansible_check_mode",
+            "ansible_collection_name",
+            "ansible_config_file",
+            "ansible_dependent_role_names",
+            "ansible_diff_mode",
+            "ansible_facts",
+            "ansible_forks",
+            "ansible_index_var",
+            "ansible_inventory_sources",
+            "ansible_limit",
+            "ansible_loop",
+            "ansible_loop_var",
+            "ansible_parent_role_names",
+            "ansible_parent_role_paths",
+            "ansible_play_batch",
+            "ansible_play_hosts",
+            "ansible_play_hosts_all",
+            "ansible_play_name",
+            "ansible_play_role_names",
+            "ansible_playbook_python",
+            "ansible_role_name",
+            "ansible_role_names",
+            "ansible_run_tags",
+            "ansible_search_path",
+            "ansible_skip_tags",
+            "ansible_verbosity",
+            "ansible_version",
+            "group_names",
+            "groups",
+            "hostvars",
+            "inventory_dir",
+            "inventory_hostname",
+            "inventory_hostname_short",
+            "inventory_file",
+            "omit",
+            "play_hosts",
+            "playbook_dir",
+            "role_name",
+            "role_names",
+            "role_path",
+            "vars",
+        }
+
+        target_vars_names = set(all_vars.keys()) - filtered_vars
+        target_vars = {name: all_vars[name] for name in target_vars_names}
+
+        if target_vars:
             with open(host_vars_file_path, "w") as host_vars_file:
                 yaml.dump(
-                    host_vars,
+                    target_vars,
                     host_vars_file,
                     Dumper=AnsibleDumper,
                     default_flow_style=False,
@@ -417,7 +439,6 @@ class QubesPlayExecutor:
             self._add_play(self.play)
             self._add_roles(self.play)
             self._add_host_vars()
-            self._add_group_vars()
             self._add_inventory()
             tar_file_path = self._build_tar()
             ansible_args = self._build_ansible_args()
