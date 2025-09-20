@@ -22,7 +22,8 @@ lint:
     # install dependencies
     - sudo qubes-dom0-update -y ansible python3-pytest python3-coverage perl-Digest-SHA
     # install from artifacts
-    - find $CI_PROJECT_DIR/artifacts/repository -name '*.noarch.rpm' -exec sudo dnf install -y {} \+
+    - find $CI_PROJECT_DIR/artifacts/repository/host-fc* -name '*.noarch.rpm' -exec sudo dnf install -y {} \+
+    - $CI_PROJECT_DIR/ci/install_ansible_vm.sh
   script:
     # run ansible's tests
     - cd /usr/share/ansible && sudo coverage run --data-file=$CI_PROJECT_DIR/.coverage --include=plugins/modules/qubesos.py,plugins/connection/qubes.py -m pytest -vvv tests/qubes/
@@ -31,5 +32,6 @@ r4.3:mgmt-host:
   extends: .mgmt-host-template
   needs:
     - r4.3:build:host-fc41
+    - r4.3:build:vm-fc42
   variables:
     VM_IMAGE: qubes_4.3_64bit_stable.qcow2
