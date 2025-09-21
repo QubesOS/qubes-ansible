@@ -58,6 +58,7 @@ def run_playbook(tmp_path):
     def _run(
         playbook: dict,
         inventory_format: str = "ini",
+        ansible_config: str = "ansible_proxy_strategy",
         inventory: Optional[dict] = None,
         host_vars: Optional[dict] = None,
         group_vars: Optional[dict] = None,
@@ -71,7 +72,7 @@ def run_playbook(tmp_path):
         ]
 
         shutil.copy(
-            Path(__file__).parent.parent / "ansible_proxy_strategy.cfg",
+            Path(__file__).parent.parent / f"{ansible_config}.cfg",
             tmp_path / "ansible.cfg",
         )
 
@@ -413,3 +414,123 @@ def test_proxy_with_dict_in_variable(run_playbook, vm):
     assert (
         "Could not match supplied host pattern" not in result.stderr
     ), result.stderr
+
+
+def test_guard_callback_blocking_execution(run_playbook, vm):
+    playbook = [
+        {
+            "hosts": vm.name,
+            "strategy": "linear",
+            "connection": "qubes",
+            "tasks": [
+                {
+                    "command": {"args": "whoami"},
+                }
+            ],
+        }
+    ]
+
+    inventory = {
+        "appvms": [[vm.name]],
+    }
+
+    result = run_playbook(playbook, inventory=inventory)
+
+    assert result.returncode == 1, result.stderr
+    assert "ERROR" in result.stderr
+    assert (
+        "is considered insecure and may lead to dom0 compromise."
+        in result.stderr
+    )
+
+
+def test_guard_callback_warning(run_playbook, vm):
+    playbook = [
+        {
+            "hosts": vm.name,
+            "strategy": "linear",
+            "connection": "qubes",
+            "tasks": [
+                {
+                    "command": "whoami",
+                }
+            ],
+        }
+    ]
+
+    inventory = {
+        "appvms": [[vm.name]],
+    }
+
+    result = run_playbook(
+        playbook, inventory=inventory, ansible_config="ansible_guard_off"
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "WARNING" in result.stderr
+    assert (
+        "is considered insecure and may lead to dom0 compromise."
+        in result.stderr
+    )
+
+
+def test_guard_callback_quiet(run_playbook, vm):
+    playbook = [
+        {
+            "hosts": vm.name,
+            "strategy": "linear",
+            "connection": "qubes",
+            "tasks": [
+                {
+                    "command": "whoami",
+                }
+            ],
+        }
+    ]
+
+    inventory = {
+        "appvms": [[vm.name]],
+    }
+
+    result = run_playbook(
+        playbook, inventory=inventory, ansible_config="ansible_guard_quiet"
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert (
+        "is considered insecure and may lead to dom0 compromise."
+        not in result.stderr
+    )
+
+
+def test_guard_callback_connection_setting_in_hostvars(run_playbook, vm):
+    playbook = [
+        {
+            "hosts": vm.name,
+            "strategy": "linear",
+            "connection": "ssh",
+            "tasks": [
+                {
+                    "command": "whoami",
+                }
+            ],
+        }
+    ]
+
+    inventory = {
+        "appvms": [[vm.name]],
+    }
+
+    host_vars = {vm.name: {"ansible_connection": "qubes"}}
+
+    result = run_playbook(
+        playbook,
+        inventory=inventory,
+        host_vars=host_vars,
+    )
+
+    assert result.returncode == 1, result.stderr
+    assert (
+        "is considered insecure and may lead to dom0 compromise."
+        in result.stderr
+    )
