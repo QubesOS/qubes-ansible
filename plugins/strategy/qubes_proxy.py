@@ -303,6 +303,10 @@ class QubesPlayExecutor:
                     continue
 
                 pol_file.write(f"{src} {dst} allow target=dom0\n")
+                try:
+                    shutil.chown(RPC_INCLUDE_POL_FILE, group="qubes")
+                except PermissionError:
+                    pass
             break
 
         while True:
@@ -323,6 +327,10 @@ class QubesPlayExecutor:
                     f"qubes.VMRootShell    * {src} {dst} allow\n"
                     f"admin.vm.List        * {src} dom0  allow\n"
                 )
+                try:
+                    shutil.chown(RPC_ANSIBLE_POL_FILE, group="qubes")
+                except PermissionError:
+                    pass
             break
 
     @staticmethod
