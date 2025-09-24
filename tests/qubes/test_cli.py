@@ -358,14 +358,9 @@ def test_minimalvm_connection(minimalvm, run_playbook):
 
 
 def test_ansible_doc_qubesos_module():
-    
-    cmd = [
-        "ansible-doc",
-        "-M",
-        str(PLUGIN_PATH),
-        "qubesos"
-    ]
-    
+
+    cmd = ["ansible-doc", "-M", str(PLUGIN_PATH), "qubesos"]
+
     result = subprocess.run(
         cmd,
         capture_output=True,
@@ -373,7 +368,11 @@ def test_ansible_doc_qubesos_module():
         env={"ANSIBLE_CONFIG": ANSIBLE_CONFIG},
     )
     
-    assert result.returncode == 0, f"ansible-doc failed with stderr: {result.stderr}"
+    assert (
+        result.returncode == 0
+    ), f"ansible-doc failed with stderr: {result.stderr}"
       
     # Should contain expected module information
-    assert "> QUBESOS" in result.stdout, "Documentation should mention the module name"
+    assert (
+        "> QUBESOS" in result.stdout
+    ), "Documentation should mention the module name"
