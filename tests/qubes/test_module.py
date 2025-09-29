@@ -262,25 +262,49 @@ def test_inventory_generation_and_grouping(tmp_path, qubes):
     assert set(standalonevms) == set(expected.get("StandaloneVM", []))
 
 
-def test_properties_set_and_tag_vm(qubes, vmname, request):
+def test_properties_and_features_set_and_tag_vm(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
     props = {"autostart": True, "debug": True, "memory": 256}
+    feats = {"life": "Going on", "dummy_feature": None}
     tags = ["tag1", "tag2"]
     params = {
         "state": "present",
         "name": vmname,
         "properties": props,
+        "features": feats,
         "tags": tags,
         "notes": "For your eyes only",
     }
     rc, res = core(Module(params))
     assert rc == VIRT_SUCCESS
-    changed_values = res["Properties updated"]
-    assert "autostart" in changed_values
+    props_values = res["Properties updated"]
+    assert "autostart" in props_values
     assert qubes.domains[vmname].autostart is True
+    feats_values = res["Features updated"]
+    assert "life" in feats_values
+    assert "dummy_feature" not in feats_values
     for t in tags:
         assert t in qubes.domains[vmname].tags
+    for feat, value in feats.items():
+        assert qubes.domains[vmname].features.get(feat, None) == value
     assert qubes.domains[vmname].get_notes() == "For your eyes only"
+
+
+def test_features_vm(qubes, vmname, request):
+    request.node.mark_vm_created(vmname)
+    feats = {"life": "Going on", "dummy_feature": None}
+    params = {
+        "state": "present",
+        "name": vmname,
+        "features": feats,
+    }
+    rc, res = core(Module(params))
+    assert rc == VIRT_SUCCESS
+    feats_values = res["Features updated"]
+    assert "life" in feats_values
+    assert "dummy_feature" not in feats_values
+    for feat, value in feats.items():
+        assert qubes.domains[vmname].features.get(feat, None) == value
 
 
 def test_properties_invalid_key(qubes):
