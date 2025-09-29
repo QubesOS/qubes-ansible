@@ -123,6 +123,9 @@ options:
           - services (list)
           - volumes (list of dict that must include both 'name' and 'size')
     default: {}
+  features:
+    description:
+      - A dictionary of VM features to set (or remove). No value for removing.
   tags:
     description:
       - A list of tags to apply to the VM.
@@ -485,18 +488,12 @@ class QubesVirt(object):
                         changed = True
                         values_changed.append(key)
 
+            # use of `features` nested in properties is legacy use. Drop by 2030
             elif key == "features":
-                for fkey, fval in val.items():
-                    if fval is None:
-                        if fkey in vm.features:
-                            del vm.features[fkey]
-                            changed = True
-                    else:
-                        if vm.features.get(fkey) != fval:
-                            vm.features[fkey] = fval
-                            changed = True
-                if changed and "features" not in values_changed:
-                    values_changed.append("features")
+                if self.features(vmname, val):
+                    changed = True
+                    if "features" not in values_changed:
+                        values_changed.append("features")
 
             elif key == "services":
                 for svc in val:
@@ -527,6 +524,20 @@ class QubesVirt(object):
                     values_changed.append(key)
 
         return changed, values_changed
+
+    def features(self, vmname: str, feats: dict[str, str | None]) -> list:
+        """Sets the given featuress to the qube"""
+        features_changed = []
+        vm = self.get_vm(vmname)
+        for fkey, fval in feats.items():
+            if fval is None:
+                if fkey in vm.features:
+                    del vm.features[fkey]
+                    features_changed.append(fkey)
+            elif vm.features.get(fkey) != fval:
+                vm.features[fkey] = fval
+                features_changed.append(fkey)
+        return features_changed
 
     def remove(self, vmname):
         """Destroy and then delete a qube's configuration and disk."""
@@ -674,6 +685,7 @@ def core(module):
     label = module.params.get("label", "red")
     template = module.params.get("template", None)
     properties = module.params.get("properties", {})
+    features = module.params.get("features", {})
     tags = module.params.get("tags", [])
     devices = module.params.get("devices", [])
     netvm = None
@@ -832,15 +844,25 @@ def core(module):
             tags_changed = []
             if tags:
                 tags_changed = v.tags(guest, tags)
+            feats_changed = []
+            if features:
+                feats_changed = v.features(guest, features)
             dev_changed = apply_devices(guest)
             res = {"changed": prop_changed or dev_changed}
             if tags_changed:
                 res["Tags updated"] = tags_changed
+            if feats_changed:
+                res["Features updated"] = feats_changed
             if prop_changed:
                 res["Properties updated"] = prop_vals
             if dev_changed:
                 res["Devices updated"] = True
             return VIRT_SUCCESS, res
+
+    # features will only work with state=present
+    if features and state == "present" and guest and vmtype:
+        res = v.features(guest, features)
+        return VIRT_SUCCESS, {"changed": bool(res), "Features updated": res}
 
     # This is without any properties
     if state == "present" and guest:
@@ -986,6 +1008,7 @@ def main():
             vmtype=dict(type="str", default="AppVM"),
             template=dict(type="str", default=None),
             properties=dict(type="dict", default={}),
+            features=dict(type="dict", default={}),
             tags=dict(type="list", default=[]),
             devices=dict(type="raw", default=[]),
             gather_device_facts=dict(type="bool", default=False),
