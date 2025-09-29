@@ -281,6 +281,21 @@ def test_properties_set_and_tag_vm(qubes, vmname, request):
         assert t in qubes.domains[vmname].tags
 
 
+def test_features_vm(qubes, vmname, request):
+    request.node.mark_vm_created(vmname)
+    feats = {"life": "Going on", "dummy_feature": None}
+    params = {
+        "state": "present",
+        "name": vmname,
+        "features": feats,
+    }
+    rc, res = core(Module(params))
+    assert rc == VIRT_SUCCESS
+    feats_values = res["Features updated"]
+    assert "life" in feats_values
+    assert "dummy_feature" not in feats_values
+
+
 def test_properties_invalid_key(qubes):
     # Unknown property should fail
     rc, res = core(
