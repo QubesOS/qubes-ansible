@@ -844,10 +844,15 @@ def core(module):
             tags_changed = []
             if tags:
                 tags_changed = v.tags(guest, tags)
+            feats_changed = []
+            if features:
+                feats_changed = v.features(guest, features)
             dev_changed = apply_devices(guest)
             res = {"changed": prop_changed or dev_changed}
             if tags_changed:
                 res["Tags updated"] = tags_changed
+            if feats_changed:
+                res["Features updated"] = feats_changed
             if prop_changed:
                 res["Properties updated"] = prop_vals
             if dev_changed:
