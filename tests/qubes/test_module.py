@@ -271,6 +271,7 @@ def test_properties_set_and_tag_vm(qubes, vmname, request):
         "name": vmname,
         "properties": props,
         "tags": tags,
+        "notes": "For your eyes only",
     }
     rc, res = core(Module(params))
     assert rc == VIRT_SUCCESS
@@ -279,6 +280,7 @@ def test_properties_set_and_tag_vm(qubes, vmname, request):
     assert qubes.domains[vmname].autostart is True
     for t in tags:
         assert t in qubes.domains[vmname].tags
+    assert qubes.domains[vmname].get_notes() == "For your eyes only"
 
 
 def test_properties_invalid_key(qubes):
@@ -415,6 +417,21 @@ def test_properties_missing_volume_fields(qubes, vmname, request):
     )
     assert rc2 == VIRT_FAILED
     assert "Missing size for the volume" in res2
+
+
+def test_notes(qubes, vmname, request):
+    payload = {
+        "state": "present",
+        "name": vmname,
+        "notes": "For your eyes only",
+    }
+    rc, res = core(Module(payload))
+    assert rc == VIRT_SUCCESS
+    assert qubes.domains[vmname].get_notes() == "For your eyes only"
+    # The 2nd call should not change the notes
+    rc, res = core(Module(payload))
+    assert rc == VIRT_SUCCESS
+    assert not res.get("changed", False)
 
 
 def test_removetags_errors_if_no_tags_present(qubes, vmname, request):
