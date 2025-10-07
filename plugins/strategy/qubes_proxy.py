@@ -233,7 +233,7 @@ class QubesPlayExecutor:
         of the list).
         """
         play_yaml = self._get_first_play_yaml(*play.get_path().split(":"))
-        play_yaml["hosts"] = [self.host_name]
+        play_yaml["hosts"] = [str(self.host_name)]
         play_yaml["strategy"] = "linear"
         playbook_chunk_path = self.temp_dir / "playbook.yaml"
         with playbook_chunk_path.open("w") as playbook_chunk_file:
