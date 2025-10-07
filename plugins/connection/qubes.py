@@ -98,7 +98,13 @@ class Connection(ConnectionBase):
         if not cmd.endswith("\n"):
             cmd += "\n"
 
-        local_cmd = ["qvm-run", "--pass-io", "--service", self._remote_vmname]
+        local_cmd = [
+            "qvm-run",
+            "--no-gui",
+            "--pass-io",
+            "--service",
+            self._remote_vmname,
+        ]
         # The Ansible module framework catches invalid remote_user values
         if self.user == "root":
             local_cmd.append("qubes.VMRootShell")
@@ -173,6 +179,7 @@ class Connection(ConnectionBase):
         cmd_args = [
             "qvm-run",
             "--pass-io",
+            "--no-gui",
             self._remote_vmname,
             f"cat {in_path}",
         ]
