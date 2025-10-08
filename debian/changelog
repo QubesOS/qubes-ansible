@@ -1,3 +1,20 @@
+qubes-ansible-vm (1.2.3-1) unstable; urgency=medium
+
+  [ Guillaume Chinal ]
+  * disp mgmt qube should be internal
+  * build a merged view of all host variables
+  * use AnsibleDumper to write the playbook
+  * add tests for qubes_proxy
+  * qvm-run must use --no-gui
+  * stop Ansible execution if proxy is not used
+  * update readme
+  * set qubes group on policies files
+
+  [ Marek Marczykowski-Górecki ]
+  * Fix handling yaml inventory
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Wed, 08 Oct 2025 05:20:09 +0200
+
 qubes-ansible-vm (1.2.2-1) unstable; urgency=medium
 
   [ Guillaume Chinal ]
