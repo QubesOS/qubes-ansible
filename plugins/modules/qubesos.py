@@ -149,6 +149,9 @@ options:
           - options (dict, optional): extra Qubes device flags to pass when attaching.
     type: raw
     default: []
+  notes:
+    description:
+      - Notes and comments (up to 256KB of clear text), For user reference only
 
 requirements:
   - python >= 3.12
@@ -528,6 +531,15 @@ class QubesVirt(object):
 
         return changed, values_changed
 
+    def notes(self, vmname: str, new_notes: str) -> bool:
+        """Set the qube notes. Returns true if changed"""
+        vm = self.get_vm(vmname)
+        current_notes = vm.get_notes()
+        if current_notes == new_notes:
+            return False
+        vm.set_notes(new_notes)
+        return True
+
     def remove(self, vmname):
         """Destroy and then delete a qube's configuration and disk."""
         try:
@@ -676,6 +688,7 @@ def core(module):
     properties = module.params.get("properties", {})
     tags = module.params.get("tags", [])
     devices = module.params.get("devices", [])
+    notes = module.params.get("notes", None)
     netvm = None
     res = {}
     device_specs = []
@@ -840,7 +853,14 @@ def core(module):
                 res["Properties updated"] = prop_vals
             if dev_changed:
                 res["Devices updated"] = True
+            if notes:
+                res["Notes updated"] = v.notes(guest, notes)
             return VIRT_SUCCESS, res
+
+    # notes will only work with state=present
+    if notes and state == "present" and guest and vmtype:
+        result = v.notes(guest, notes)
+        return VIRT_SUCCESS, {"changed": result, "Notes updated": result}
 
     # This is without any properties
     if state == "present" and guest:
@@ -988,6 +1008,7 @@ def main():
             properties=dict(type="dict", default={}),
             tags=dict(type="list", default=[]),
             devices=dict(type="raw", default=[]),
+            notes=dict(type="str", default=None),
             gather_device_facts=dict(type="bool", default=False),
         ),
     )
