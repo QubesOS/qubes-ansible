@@ -28,7 +28,7 @@ def run_playbook(tmp_path, ansible_config):
         cmd = [
             "ansible-playbook",
             "-i",
-            f"localhost,{','.join(vms)}",
+            f"localhost,dom0,{','.join(vms)}",
             "-c",
             "local",
             "-M",
@@ -48,15 +48,20 @@ def run_playbook(tmp_path, ansible_config):
 
 
 @pytest.mark.parametrize(
-    "ansible_config", ["ansible_linear_strategy", "ansible_proxy_strategy"]
+    "ansible_config",
+    ["ansible_linear_strategy", "ansible_proxy_strategy"],
 )
-def test_create_and_destroy_vm(run_playbook, request):
+@pytest.mark.parametrize(
+    "target_host",
+    ["localhost", "dom0"],
+)
+def test_create_and_destroy_vm(run_playbook, request, target_host):
     name = f"test-vm-{uuid.uuid4().hex[:6]}"
     request.node.mark_vm_created(name)
 
     playbook = [
         {
-            "hosts": "localhost",
+            "hosts": target_host,
             "tasks": [
                 {
                     "name": "Create AppVM",
@@ -92,13 +97,17 @@ def test_create_and_destroy_vm(run_playbook, request):
 @pytest.mark.parametrize(
     "ansible_config", ["ansible_linear_strategy", "ansible_proxy_strategy"]
 )
-def test_properties_and_tags_playbook(run_playbook, request):
+@pytest.mark.parametrize(
+    "target_host",
+    ["localhost", "dom0"],
+)
+def test_properties_and_tags_playbook(run_playbook, request, target_host):
     name = f"test-vm-{uuid.uuid4().hex[:6]}"
     request.node.mark_vm_created(name)
 
     playbook = [
         {
-            "hosts": "localhost",
+            "hosts": target_host,
             "tasks": [
                 {
                     "name": "Create VM with properties",
@@ -125,11 +134,11 @@ def test_properties_and_tags_playbook(run_playbook, request):
 
     # Ensure properties and tags were applied
     run_output = json.loads(result.stdout)
-    assert run_output["plays"][0]["tasks"][1]["hosts"]["localhost"][
+    assert run_output["plays"][0]["tasks"][1]["hosts"][target_host][
         "changed"
     ], result.stdout
     assert {"tag1", "tag2"} == set(
-        run_output["plays"][0]["tasks"][1]["hosts"]["localhost"].get(
+        run_output["plays"][0]["tasks"][1]["hosts"][target_host].get(
             "Tags updated", []
         )
     ), result.stdout
@@ -138,11 +147,15 @@ def test_properties_and_tags_playbook(run_playbook, request):
 @pytest.mark.parametrize(
     "ansible_config", ["ansible_linear_strategy", "ansible_proxy_strategy"]
 )
-def test_inventory_playbook(run_playbook, tmp_path, qubes):
+@pytest.mark.parametrize(
+    "target_host",
+    ["localhost", "dom0"],
+)
+def test_inventory_playbook(run_playbook, tmp_path, qubes, target_host):
     # Generate inventory via playbook
     playbook = [
         {
-            "hosts": "localhost",
+            "hosts": target_host,
             "tasks": [
                 {
                     "name": "Create inventory",

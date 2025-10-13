@@ -256,6 +256,7 @@ def create_inventory(result):
     Creates the inventory file dynamically for QubesOS
     """
     template_str = """[local]
+dom0
 localhost
 
 [local:vars]
