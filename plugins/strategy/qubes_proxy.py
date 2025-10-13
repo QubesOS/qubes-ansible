@@ -15,6 +15,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import asyncio
 import fcntl
 import multiprocessing
 import os
@@ -23,12 +24,13 @@ import shutil
 import tarfile
 import tempfile
 import traceback
-import time
 
 from contextlib import suppress
 from pathlib import Path
 
 import qubesadmin
+import qubesadmin.events.utils
+import qubesadmin.exc
 import yaml
 
 from ansible import context
@@ -119,7 +121,7 @@ class QubesPlayExecutor:
         self.variable_manager = iterator._variable_manager
         self.variable_manager._loader = self.loader
 
-        self.dispvm_initially_running = False
+        self._dispvm_initially_running = False
 
         if hasattr(self.host.name, "_strip_unsafe"):
             self.host_name = self.host.name._strip_unsafe()
@@ -430,7 +432,8 @@ class QubesPlayExecutor:
             dispvm.features["gui"] = False
             dispvm.netvm = None
             dispvm.auto_cleanup = True
-        self._dispvm_initially_running = self.vm.is_running()
+        self.vvv(f"Dispvm <{dispvm.name}> was running: {dispvm.is_running()}")
+        self._dispvm_initially_running = dispvm.is_running()
         if not dispvm.is_running():
             dispvm.start()
         return dispvm
@@ -491,11 +494,27 @@ class QubesPlayExecutor:
         finally:
             self._remove_rpc_policies()
             shutil.rmtree(self.temp_dir)
-            if not self.dispvm_initially_running:
+            if not self._dispvm_initially_running:
+                self.vvv(f"Stopping {dispvm.name}")
                 dispvm.shutdown()
-                while dispvm.is_running():
-                    time.sleep(1)
-                time.sleep(2)
+                try:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    loop.run_until_complete(
+                        asyncio.wait_for(
+                            qubesadmin.events.utils.wait_for_domain_shutdown(
+                                [dispvm]
+                            ),
+                            dispvm.shutdown_timeout,
+                        )
+                    )
+
+                except asyncio.TimeoutError:
+                    try:
+                        display.warning(f"<Qubes> killing {dispvm.name}")
+                        dispvm.kill()
+                    except qubesadmin.exc.QubesVMNotStartedError:
+                        pass
 
     def _verbose(self, msg: str, level: int):
         getattr(display, "v" * level)(f"<{self.host_name}> {msg}")

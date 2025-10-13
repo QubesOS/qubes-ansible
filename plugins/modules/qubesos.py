@@ -165,11 +165,15 @@ author:
   - Frédéric Pierret
 """
 
+import asyncio
 import time
 import traceback
 
+from contextlib import suppress
+
 try:
     import qubesadmin
+    import qubesadmin.events.utils
     from qubesadmin.exc import (
         QubesVMNotStartedError,
         QubesTagNotFoundError,
@@ -371,16 +375,23 @@ class QubesVirt(object):
         optionally waiting until it halts.
         """
         vm = self.get_vm(vmname)
-        vm.shutdown()
+        with suppress(QubesVMNotStartedError):
+            vm.shutdown()
+
         if wait:
-            start = time.time()
-            while time.time() - start < vm.shutdown_timeout:
-                if vm.is_halted():
-                    return 0
-                time.sleep(1)
-            raise RuntimeError(
-                f"Timeout: VM {vmname} did not halt within {vm.shutdown_timeout}s"
-            )
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                loop.run_until_complete(
+                    asyncio.wait_for(
+                        qubesadmin.events.utils.wait_for_domain_shutdown([vm]),
+                        vm.shutdown_timeout,
+                    )
+                )
+            except asyncio.TimeoutError:
+                raise RuntimeError(
+                    f"Timeout: VM {vmname} did not halt within {vm.shutdown_timeout}s"
+                )
         return 0
 
     def restart(self, vmname, wait=False):
