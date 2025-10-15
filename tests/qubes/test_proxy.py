@@ -53,6 +53,83 @@ class ResultsCollectorJSONCallback(CallbackBase):
 
 
 @pytest.fixture
+def ansible_mock(monkeypatch):
+    class AnsibleMock:
+        def __init__(self, hosts, forks=10):
+            self.hosts = []
+            self.loader = DataLoader()
+            context.CLIARGS = ImmutableDict(
+                connection="smart",
+                module_path=["/usr/share/ansible"],
+                forks=forks,
+                become=None,
+                become_method=None,
+                become_user=None,
+                check=False,
+                diff=False,
+            )
+            self.sources = ",".join(hosts)
+            if len(hosts) == 1:
+                self.sources += ","
+            self.results_callback = ResultsCollectorJSONCallback()
+
+            self.inventory = InventoryManager(
+                loader=self.loader, sources=self.sources
+            )
+            self.variable_manager = VariableManager(
+                loader=self.loader, inventory=self.inventory
+            )
+            self.tqm = TaskQueueManager(
+                inventory=self.inventory,
+                variable_manager=self.variable_manager,
+                loader=self.loader,
+                passwords={},
+                stdout_callback=self.results_callback,
+                # Use our custom callback instead of the ``default`` callback plugin, which prints to stdout
+            )
+
+            # required to be set for strategy_loader
+            self.tqm._workers = None
+
+            # Mock proxy_run of qubes_proxy strategy
+            self.proxy_runs = {}
+
+            def fake_proxy_run(iterator, *_):
+                for host in iterator._play.hosts:
+                    self.proxy_runs.setdefault(str(host), 0)
+                    self.proxy_runs[str(host)] += 1
+                return 0
+
+            strategy = strategy_loader.get("qubes_proxy", tqm=self.tqm)
+            assert strategy is not None
+            strategy.proxy_run = fake_proxy_run
+            monkeypatch.setattr(
+                strategy_loader, "get", Mock(return_value=strategy)
+            )
+
+            # Mock run method of linear strategy (Ansible default strategy)
+            self.linear_runs = {}
+
+            def fake_linear_run(_, iterator, *__):
+                for host in iterator._play.hosts:
+                    self.linear_runs.setdefault(str(host), 0)
+                    self.linear_runs[str(host)] += 1
+                return 0
+
+            LinearStrategyModule.run = fake_linear_run
+
+        def run(self, play_source: dict):
+            play = Play().load(
+                play_source,
+                variable_manager=self.variable_manager,
+                loader=self.loader,
+            )
+            self.tqm.run(play)
+
+    return AnsibleMock
+
+
+@pytest.fixture
 def run_playbook(tmp_path):
 
     def _run(
@@ -133,6 +210,25 @@ def run_playbook(tmp_path):
 def test_proxy_with_simple_local_playbook(run_playbook):
     playbook = [{"hosts": "localhost", "tasks": [{"debug": {"msg": "foo"}}]}]
     result = run_playbook(playbook)
+    assert result.returncode == 0, result.stderr
+    assert (
+        "Could not match supplied host pattern" not in result.stderr
+    ), result.stderr
+
+
+def test_proxy_with_simple_local_playbook_dom0(run_playbook):
+    playbook = [{"hosts": "dom0", "tasks": [{"debug": {"msg": "foo"}}]}]
+    result = run_playbook(
+        playbook,
+        inventory={
+            "local": [
+                [
+                    "dom0",
+                ]
+            ],
+            "local:vars": [["ansible_connection", "local"]],
+        },
+    )
     assert result.returncode == 0, result.stderr
     assert (
         "Could not match supplied host pattern" not in result.stderr
@@ -226,35 +322,9 @@ def test_proxy_with_dynamic_inventory(run_playbook, vm):
     ), result.stderr
 
 
-def test_proxy_routing(monkeypatch):
+def test_proxy_routing(ansible_mock):
     hosts = ["work", "work2", "localhost", "work3"]
-    sources = ",".join(hosts)
-    if len(hosts) == 1:
-        sources += ","
-    context.CLIARGS = ImmutableDict(
-        connection="smart",
-        module_path=["/to/mymodules", "/usr/share/ansible"],
-        forks=10,
-        become=None,
-        become_method=None,
-        become_user=None,
-        check=False,
-        diff=False,
-    )
-    loader = DataLoader()
-    results_callback = ResultsCollectorJSONCallback()
-    inventory = InventoryManager(loader=loader, sources=sources)
-    variable_manager = VariableManager(loader=loader, inventory=inventory)
-    tqm = TaskQueueManager(
-        inventory=inventory,
-        variable_manager=variable_manager,
-        loader=loader,
-        passwords={},
-        stdout_callback=results_callback,
-        # Use our custom callback instead of the ``default`` callback plugin, which prints to stdout
-    )
-
-    play_source = {
+    play = {
         "name": "Simple Play",
         "hosts": hosts,
         "gather_facts": "no",
@@ -269,37 +339,11 @@ def test_proxy_routing(monkeypatch):
         ],
     }
 
-    # required to be set for strategy_loader
-    tqm._workers = None
-    strategy = strategy_loader.get("qubes_proxy", tqm=tqm)
-    assert strategy is not None
+    ansible = ansible_mock(hosts)
+    ansible.run(play)
 
-    calls = {}
-
-    def fake_proxy_run(iterator, play_context):
-        for host in iterator._play.hosts:
-            calls.setdefault(str(host), 0)
-            calls[str(host)] += 1
-        return 0
-
-    strategy.proxy_run = fake_proxy_run
-    fake_linear_run = Mock()
-    fake_linear_run.return_value = 0
-    LinearStrategyModule.run = fake_linear_run
-
-    fake_get_strategy = Mock()
-    fake_get_strategy.return_value = strategy
-    monkeypatch.setattr(strategy_loader, "get", fake_get_strategy)
-
-    play = Play().load(
-        play_source, variable_manager=variable_manager, loader=loader
-    )
-    tqm.run(play)
-
-    assert calls == {"work": 1, "work2": 1, "work3": 1}
-
-    fake_get_strategy.assert_called_once()
-    fake_linear_run.assert_called_once()
+    assert ansible.proxy_runs == {"work": 1, "work2": 1, "work3": 1}
+    assert ansible.linear_runs == {"localhost": 1}
 
 
 def test_proxy_with_mixed_variables_sources(run_playbook, vm):
@@ -534,3 +578,25 @@ def test_guard_callback_connection_setting_in_hostvars(run_playbook, vm):
         "is considered insecure and may lead to dom0 compromise."
         in result.stderr
     )
+
+
+def test_proxy_routing_dom0_host(ansible_mock):
+    hosts = ["localhost", "dom0", "work1", "work2"]
+    play = {
+        "name": "Simple Play",
+        "hosts": hosts,
+        "gather_facts": "no",
+        "strategy": "qubes_proxy",
+        "tasks": [
+            {
+                "action": {
+                    "module": "command",
+                    "args": {"cmd": "/usr/bin/uptime"},
+                }
+            }
+        ],
+    }
+    ansible = ansible_mock(hosts)
+    ansible.run(play)
+    assert ansible.proxy_runs == {"work1": 1, "work2": 1}
+    assert ansible.linear_runs == {"localhost": 1, "dom0": 1}

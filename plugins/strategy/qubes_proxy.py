@@ -622,12 +622,14 @@ class StrategyModule(LinearStrategyModule):
 
         target_hosts = self._inventory.get_hosts(play.hosts)
         local_hosts = [
-            host for host in target_hosts if host.name == "localhost"
+            host for host in target_hosts if host.name in ["localhost", "dom0"]
         ]
         retval_local_exec = self._tqm.RUN_OK
 
         remote_hosts = [
-            host for host in target_hosts if host.name != "localhost"
+            host
+            for host in target_hosts
+            if host.name not in ["localhost", "dom0"]
         ]
         retval_remote_exec = self._tqm.RUN_OK
 
