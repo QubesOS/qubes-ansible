@@ -62,20 +62,20 @@ options:
   command:
     description:
       - Non-idempotent command to execute on the VM.
-      - Available commands include:
-        - C(create): Create a new VM.
-        - C(destroy): Force shutdown of a VM.
-        - C(pause): Pause a running VM.
-        - C(shutdown): Gracefully shut down a VM.
-        - C(status): Retrieve the current state of a VM.
-        - C(start): Start a VM.
-        - C(stop): Stop a VM.
-        - C(unpause): Resume a paused VM.
-        - C(removetags): Remove specified tags from a VM.
-        - C(info): Retrieve information about all VMs.
-        - C(list_vms): List VMs filtered by state.
-        - C(get_states): Get the states of all VMs.
-        - C(createinventory): Generate an inventory file for Qubes OS VMs.
+      - "Available commands include:"
+      - " - C(create): Create a new VM."
+      - " - C(destroy): Force shutdown of a VM."
+      - " - C(pause): Pause a running VM."
+      - " - C(shutdown): Gracefully shut down a VM."
+      - " - C(status): Retrieve the current state of a VM."
+      - " - C(start): Start a VM."
+      - " - C(stop): Stop a VM."
+      - " - C(unpause): Resume a paused VM."
+      - " - C(removetags): Remove specified tags from a VM."
+      - " - C(info): Retrieve information about all VMs."
+      - " - C(list_vms): List VMs filtered by state."
+      - " - C(get_states): Get the states of all VMs."
+      - " - C(createinventory): Generate an inventory file for Qubes OS VMs."
   label:
     description:
       - Label (or color) assigned to the VM. For more details, see the Qubes OS Glossary.
@@ -94,38 +94,35 @@ options:
   properties:
     description:
       - A dictionary of VM properties to set.
-      - Valid keys include:
-          - autostart (bool)
-          - debug (bool)
-          - include_in_backups (bool)
-          - kernel (str)
-          - kernelopts (str)
-          - label (str)
-          - maxmem (int)
-          - memory (int)
-          - provides_network (bool)
-          - netvm (str)
-          - default_dispvm (str)
-          - management_dispvm (str)
-          - default_user (str)
-          - guivm (str)
-          - audiovm (str)
-          - ip (str)
-          - ip6 (str)
-          - mac (str)
-          - qrexec_timeout (int)
-          - shutdown_timeout (int)
-          - template (str)
-          - template_for_dispvms (bool)
-          - vcpus (int)
-          - virt_mode (str)
-          - features (dict)
-          - services (list)
-          - volumes (list of dict that must include both 'name' and 'size')
+      - "Valid keys include:"
+      - " - autostart (bool)"
+      - " - debug (bool)"
+      - " - include_in_backups (bool)"
+      - " - kernel (str)"
+      - " - kernelopts (str)"
+      - " - label (str)"
+      - " - maxmem (int)"
+      - " - memory (int)"
+      - " - provides_network (bool)"
+      - " - netvm (str)"
+      - " - default_dispvm (str)"
+      - " - management_dispvm (str)"
+      - " - default_user (str)"
+      - " - guivm (str)"
+      - " - audiovm (str)"
+      - " - ip (str)"
+      - " - ip6 (str)"
+      - " - mac (str)"
+      - " - qrexec_timeout (int)"
+      - " - shutdown_timeout (int)"
+      - " - template (str)"
+      - " - template_for_dispvms (bool)"
+      - " - vcpus (int)"
+      - " - virt_mode (str)"
+      - " - features (dict)"
+      - " - services (list)"
+      - " - volumes (list of dict that must include both 'name' and 'size')"
     default: {}
-  features:
-    description:
-      - A dictionary of VM features to set (or remove). No value for removing.
   tags:
     description:
       - A list of tags to apply to the VM.
@@ -135,26 +132,23 @@ options:
   devices:
     description:
       - Device assignment configuration for the VM.
-      - Supported usage patterns:
-        1. A list (default _strict_ mode) device specs (strings or dicts). The VM's assigned devices will be exactly those listed, removing any others.
-        2. A dictionary:
-           - strategy (str): assignment strategy to use.  
-             - C(strict) (default): enforce exact match of assigned devices to C(items).  
-             - C(append): add only new devices in C(items), leaving existing assignments intact.
-           - items (list): list of device specs (strings or dicts) to apply under the chosen strategy.
-      - Device spec formats:
-        - string: `<devclass>:<backend_domain>:<port_id>[:<dev_id>]` (e.g. C(pci:dom0:5), C(block:dom0:vdb))
-        - dict:
-          - device (str, required): the string spec as above.
-          - mode (str, optional):
-            - For PCI devices defaults to C(required).
-            - For other classes defaults to C(auto-attach).
-          - options (dict, optional): extra Qubes device flags to pass when attaching.
+      - "Supported usage patterns:"
+      - "1. A list (default _strict_ mode) device specs (strings or dicts). The VM's assigned devices will be exactly those listed, removing any others."
+      - "2. A dictionary:"
+      - " - strategy (str): assignment strategy to use.  "
+      - "    - C(strict) (default): enforce exact match of assigned devices to C(items).  "
+      - "    - C(append): add only new devices in C(items), leaving existing assignments intact."
+      - " - items (list): list of device specs (strings or dicts) to apply under the chosen strategy."
+      - "Device spec formats:"
+      - " - string: `<devclass>:<backend_domain>:<port_id>[:<dev_id>]` (e.g. C(pci:dom0:5), C(block:dom0:vdb))"
+      - " - dict:"
+      - "    - device (str, required): the string spec as above."
+      - "    - mode (str, optional):"
+      - "       - For PCI devices defaults to C(required)."
+      - "       - For other classes defaults to C(auto-attach)."
+      - "    - options (dict, optional): extra Qubes device flags to pass when attaching."
     type: raw
     default: []
-  notes:
-    description:
-      - Notes and comments (up to 256KB of clear text), For user reference only
 
 requirements:
   - python >= 3.12

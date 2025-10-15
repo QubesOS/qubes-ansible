@@ -391,3 +391,24 @@ def test_minimalvm_connection(minimalvm, run_playbook, ansible_config):
         ), become_result.stdout
     else:
         assert "sudo: a password is required" in become_result.stdout
+
+
+def test_ansible_doc_qubesos_module():
+
+    cmd = ["ansible-doc", "-M", str(PLUGIN_PATH), "qubesos"]
+
+    result = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        env={"ANSIBLE_CONFIG": ANSIBLE_CONFIG},
+    )
+
+    assert (
+        result.returncode == 0
+    ), f"ansible-doc failed with stderr: {result.stderr}"
+
+    # Should contain expected module information
+    assert (
+        "> QUBESOS" in result.stdout
+    ), "Documentation should mention the module name"
