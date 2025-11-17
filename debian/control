@@ -10,6 +10,7 @@ Package: qubes-ansible-vm
 Architecture: any
 Depends:
  ansible,
+ qubes-core-admin-client,
  ${python3:Depends},
  ${misc:Depends}
 Description: qubes-ansible RPC script to run Ansible on a disposable VM
