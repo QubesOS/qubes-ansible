@@ -123,6 +123,9 @@ options:
       - " - services (list)"
       - " - volumes (list of dict that must include both 'name' and 'size')"
     default: {}
+  features:
+    description:
+      - A dictionary of VM features to set (or remove). No value for removing.
   tags:
     description:
       - A list of tags to apply to the VM.
@@ -149,6 +152,9 @@ options:
       - "    - options (dict, optional): extra Qubes device flags to pass when attaching."
     type: raw
     default: []
+  notes:
+    description:
+      - Notes and comments (up to 256KB of clear text), For user reference only
 
 requirements:
   - python >= 3.12
