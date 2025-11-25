@@ -863,28 +863,28 @@ def core(module):
                 if not vm.template_for_dispvms:
                     return VIRT_FAILED, {"Missing dispvm capability": val}
 
-        if state == "present" and guest and vmtype:
-            prop_changed, prop_vals = v.properties(guest, properties)
-            # Apply the tags
-            tags_changed = []
-            if tags:
-                tags_changed = v.tags(guest, tags)
-            feats_changed = []
-            if features:
-                feats_changed = v.features(guest, features)
-            dev_changed = apply_devices(guest)
-            res = {"changed": prop_changed or dev_changed}
-            if tags_changed:
-                res["Tags updated"] = tags_changed
-            if feats_changed:
-                res["Features updated"] = feats_changed
-            if prop_changed:
-                res["Properties updated"] = prop_vals
-            if dev_changed:
-                res["Devices updated"] = True
-            if notes:
-                res["Notes updated"] = v.notes(guest, notes)
-            return VIRT_SUCCESS, res
+    if state == "present" and guest and vmtype:
+        prop_changed, prop_vals = v.properties(guest, properties)
+        # Apply the tags
+        tags_changed = []
+        if tags:
+            tags_changed = v.tags(guest, tags)
+        feats_changed = []
+        if features:
+            feats_changed = v.features(guest, features)
+        dev_changed = apply_devices(guest)
+        res = {"changed": prop_changed or dev_changed}
+        if tags_changed:
+            res["Tags updated"] = tags_changed
+        if feats_changed:
+            res["Features updated"] = feats_changed
+        if prop_changed:
+            res["Properties updated"] = prop_vals
+        if dev_changed:
+            res["Devices updated"] = True
+        if notes:
+            res["Notes updated"] = v.notes(guest, notes)
+        return VIRT_SUCCESS, res
 
     # notes will only work with state=present
     if notes and state == "present" and guest and vmtype:

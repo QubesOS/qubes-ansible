@@ -289,6 +289,19 @@ def test_properties_and_features_set_and_tag_vm(qubes, vmname, request):
         assert qubes.domains[vmname].features.get(feat, None) == value
     assert qubes.domains[vmname].get_notes() == "For your eyes only"
 
+    # test if updating tags work
+    tags = ["tag3", "tag4"]
+    params = {
+        "state": "present",
+        "name": vmname,
+        "tags": tags,
+    }
+    rc, res = core(Module(params))
+    assert rc == VIRT_SUCCESS
+    assert "Tags updated" in res
+    for t in tags:
+        assert t in qubes.domains[vmname].tags
+
 
 def test_features_vm(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
