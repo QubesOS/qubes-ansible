@@ -398,6 +398,45 @@ def test_properties_reset_to_default_netvm(qubes, vm, netvm, request):
     assert qubes.domains[vm.name].netvm == default_netvm
 
 
+def test_properties_reset_to_default_mac(qubes, vm, request):
+    """
+    Able to reset back to default mac
+    """
+    default_mac = vm.mac
+
+    mac = "11:22:33:44:55:66"
+
+    # Change to non-default mac
+    change_rc, change_res = core(
+        Module(
+            {
+                "state": "present",
+                "name": vm.name,
+                "properties": {"mac": mac},
+            }
+        )
+    )
+    assert "mac" in change_res["Properties updated"]
+    assert change_rc == VIRT_SUCCESS
+
+    # Ability to reset back to default mac, whatever it is
+    reset_rc, reset_res = core(
+        Module(
+            {
+                "state": "present",
+                "name": vm.name,
+                "properties": {"mac": "*default*"},
+            }
+        )
+    )
+    assert "mac" in reset_res["Properties updated"]
+    assert default_mac != mac
+    assert reset_rc == VIRT_SUCCESS
+
+    qubes.domains.refresh_cache(force=True)
+    assert qubes.domains[vm.name].mac == default_mac
+
+
 def test_properties_missing_default_dispvm(qubes):
     # default_dispvm does not exist
     rc, res = core(

@@ -483,28 +483,8 @@ class QubesVirt(object):
         ]
 
         for key, val in prefs.items():
-            if key in vm_ref_keys:
-                # determine new value or default
-                if val in (None, ""):
-                    new_val = ""
-                elif val == "*default*":
-                    new_val = qubesadmin.DEFAULT
-                else:
-                    new_val = val
-                # check and apply change
-                if new_val is qubesadmin.DEFAULT:
-                    if not vm.property_is_default(key):
-                        setattr(vm, key, new_val)
-                        changed = True
-                        values_changed.append(key)
-                else:
-                    if getattr(vm, key) != new_val:
-                        setattr(vm, key, new_val)
-                        changed = True
-                        values_changed.append(key)
-
             # use of `features` nested in properties is legacy use. Drop by 2030
-            elif key == "features":
+            if key == "features":
                 if self.features(vmname, val):
                     changed = True
                     if "features" not in values_changed:
@@ -532,11 +512,24 @@ class QubesVirt(object):
                     values_changed.append(f"volume:{vol["name"]}")
 
             else:
-                current = getattr(vm, key)
-                if current != val:
-                    setattr(vm, key, val)
-                    changed = True
-                    values_changed.append(key)
+                # determine new value or default
+                if val in (None, ""):
+                    new_val = ""
+                elif val == "*default*":
+                    new_val = qubesadmin.DEFAULT
+                else:
+                    new_val = val
+                # check and apply change
+                if new_val is qubesadmin.DEFAULT:
+                    if not vm.property_is_default(key):
+                        setattr(vm, key, new_val)
+                        changed = True
+                        values_changed.append(key)
+                else:
+                    if getattr(vm, key) != new_val:
+                        setattr(vm, key, new_val)
+                        changed = True
+                        values_changed.append(key)
 
         return changed, values_changed
 
