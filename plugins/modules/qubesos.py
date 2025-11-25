@@ -1040,7 +1040,7 @@ def main():
             properties=dict(type="dict", default={}),
             features=dict(type="dict", default={}),
             tags=dict(type="list", default=[]),
-            devices=dict(type="raw", default=[]),
+            devices=dict(type="raw", default=None),
             notes=dict(type="str", default=None),
             gather_device_facts=dict(type="bool", default=False),
         ),
