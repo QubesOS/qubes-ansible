@@ -1,3 +1,11 @@
+qubes-ansible-vm (1.2.6-1) unstable; urgency=medium
+
+  * Fix updating tags, features etc even if no properties are changed
+  * Support '*default*' special value for all properties
+  * Do not change devices if not requested
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Tue, 25 Nov 2025 19:44:31 +0100
+
 qubes-ansible-vm (1.2.5-1) unstable; urgency=medium
 
   [ Guillaume Chinal ]
