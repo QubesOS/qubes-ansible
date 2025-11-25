@@ -854,6 +854,46 @@ def test_services_aliased_to_features_only(qubes, vmname, request):
         assert qube.features[key] == "1"
 
 
+def test_devices_unchanged(qubes, vmname, request, latest_net_ports):
+    request.node.mark_vm_created(vmname)
+    port = latest_net_ports[-1]
+
+    # Initial assignment of a single PCI port
+    rc, res = core(
+        Module(
+            {
+                "state": "present",
+                "name": vmname,
+                "devices": [port],
+            }
+        )
+    )
+    assert rc == VIRT_SUCCESS
+    assert res.get("changed", False)
+
+    # Re-run without devices, should not change anything
+    rc2, res2 = core(
+        Module(
+            {
+                "state": "present",
+                "name": vmname,
+            }
+        )
+    )
+    assert rc2 == VIRT_SUCCESS
+    # No changes on the second sync
+    assert not res2.get("changed", False)
+
+    # Verify still exactly that one port is assigned
+    qubes.domains.refresh_cache(force=True)
+    assigned = qubes.domains[vmname].devices["pci"].get_assigned_devices()
+    ports_assigned = [
+        f"pci:dom0:{(d.virtual_device.port_id if hasattr(d, 'virtual_device') else d.port_id)}"
+        for d in assigned
+    ]
+    assert ports_assigned == [port]
+
+
 def test_services_and_explicit_features_combined(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
 

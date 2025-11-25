@@ -704,7 +704,7 @@ def core(module):
     properties = module.params.get("properties", {})
     features = module.params.get("features", {})
     tags = module.params.get("tags", [])
-    devices = module.params.get("devices", [])
+    devices = module.params.get("devices", None)
     notes = module.params.get("notes", None)
     netvm = None
     res = {}
@@ -720,6 +720,8 @@ def core(module):
         # flat list -> always strict
         set_mode = "strict"
         device_specs = devices
+    elif devices is None:
+        device_specs = []
     else:
         module.fail_json(msg=f"Invalid devices parameter: {devices!r}")
 
@@ -865,7 +867,10 @@ def core(module):
         feats_changed = []
         if features:
             feats_changed = v.features(guest, features)
-        dev_changed = apply_devices(guest)
+        if devices is not None:
+            dev_changed = apply_devices(guest)
+        else:
+            dev_changed = False
         res = {"changed": prop_changed or dev_changed}
         if tags_changed:
             res["Tags updated"] = tags_changed
