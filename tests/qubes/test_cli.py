@@ -395,13 +395,16 @@ def test_minimalvm_connection(minimalvm, run_playbook, ansible_config):
 
 def test_ansible_doc_qubesos_module():
 
+    ansible_config_path = Path(__file__).parent.parent / "ansible.cfg"
+    assert ansible_config_path.is_file()
+
     cmd = ["ansible-doc", "-M", str(PLUGIN_PATH), "qubesos"]
 
     result = subprocess.run(
         cmd,
         capture_output=True,
         text=True,
-        env={"ANSIBLE_CONFIG": ANSIBLE_CONFIG},
+        env={"ANSIBLE_CONFIG": str(ansible_config_path)},
     )
 
     assert (
