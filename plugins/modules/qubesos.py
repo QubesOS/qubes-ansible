@@ -83,7 +83,7 @@ options:
   vmtype:
     description:
       - The type of VM to manage.
-      - Typical values include C(AppVM), C(StandaloneVM), and C(TemplateVM).
+      - Typical values include C(AppVM), C(StandaloneVM), C(TemplateVM) and C(DispVM).
       - Refer to the Qubes OS Glossary for definitions of these terms.
     default: "AppVM"
   template:
@@ -451,6 +451,11 @@ class QubesVirt(object):
                 template_vm, vmname, vmtype, ignore_devices=True
             )
             vm.label = label
+        elif vmtype == "DispVM" and template_vm:
+            vm = self.app.add_new_vm(
+                vmtype, vmname, label, template=template_vm
+            )
+            vm.netvm = network_vm
         return 0
 
     def start(self, vmname):
