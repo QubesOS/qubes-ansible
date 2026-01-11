@@ -1,3 +1,19 @@
+qubes-ansible-vm (1.2.8-1) unstable; urgency=medium
+
+  [ TheVamp ]
+  * fix doc + add test
+  * add missing parts of the documentation
+  * fix test
+  * fix test
+
+  [ networkjanitor ]
+  * add creation of DispVM guests
+
+  [ Marek Marczykowski-Górecki ]
+  * Keep netvm as really default if default was requested
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Sun, 11 Jan 2026 19:13:09 +0100
+
 qubes-ansible-vm (1.2.7-1) unstable; urgency=medium
 
   * One more fix for not changing devices unless requested
