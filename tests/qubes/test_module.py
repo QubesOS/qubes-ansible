@@ -396,6 +396,7 @@ def test_properties_reset_to_default_netvm(qubes, vm, netvm, request):
 
     qubes.domains.refresh_cache(force=True)
     assert qubes.domains[vm.name].netvm == default_netvm
+    assert qubes.domains[vm.name].property_is_default("netvm")
 
 
 def test_properties_reset_to_default_mac(qubes, vm, request):

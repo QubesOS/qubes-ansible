@@ -431,7 +431,7 @@ class QubesVirt(object):
         """Create a new qube of the given type, label, template, and network."""
         template_vm = template or ""
         if netvm == "*default*":
-            network_vm = self.app.default_netvm
+            network_vm = qubesadmin.DEFAULT
         elif not netvm:
             network_vm = None
         else:
