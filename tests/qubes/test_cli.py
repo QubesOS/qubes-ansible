@@ -407,3 +407,24 @@ def test_ansible_doc_qubesos_module():
     assert (
         "> QUBESOS" in result.stdout
     ), "Documentation should mention the module name"
+
+
+@pytest.mark.parametrize(
+    "ansible_config", ["ansible_linear_strategy", "ansible_proxy_strategy"]
+)
+def test_state_absent_when_vm_does_not_exist(run_playbook):
+    playbook = [
+        {
+            "hosts": "localhost",
+            "tasks": [
+                {
+                    "name": "Ensure VM doesn't exist",
+                    "qubesos": {"state": "absent", "name": "not_existing_vm"},
+                }
+            ],
+        }
+    ]
+    result = run_playbook(playbook)
+    assert result.returncode == 0, result.stderr
+    output = json.loads(result.stdout)
+    assert not output["plays"][0]["tasks"][1]["hosts"]["localhost"]["changed"]

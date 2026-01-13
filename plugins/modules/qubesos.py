@@ -324,14 +324,17 @@ class QubesVirt(object):
 
     def __get_state(self, vmname):
         """Determine the current power state of a qube."""
-        vm = self.app.domains[vmname]
-        if vm.is_paused():
-            return "paused"
-        if vm.is_running():
-            return "running"
-        if vm.is_halted():
-            return "shutdown"
-        return None
+        try:
+            vm = self.app.domains[vmname]
+            if vm.is_paused():
+                return "paused"
+            if vm.is_running():
+                return "running"
+            if vm.is_halted():
+                return "shutdown"
+            return None
+        except KeyError:
+            return "absent"
 
     def get_states(self):
         """Get the names and states of all qubes."""
