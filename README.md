@@ -105,6 +105,33 @@ limitations:
   * Play recap will reflect the number of plays ran for each host instead of the number of tasks
   * Only plain text output is supported
 
+## Management VM
+
+Usage of this module with a Management VM is not yet supported. However, the 
+following policies may be added if doing so:
+
+Append the following lines to `/etc/qubes/policy.d/include/admin-local-rwx`:
+```
+mgmtvm @tag:created-by-mgmtvm allow target=dom0
+mgmtvm mgmtvm                 allow target=dom0
+```
+
+Append the following lines to `/etc/qubes/policy.d/include/admin-global-ro`:
+```
+mgmtvm @adminvm               allow target=dom0
+mgmtvm @tag:created-by-mgmtvm allow target=dom0
+mgmtvm mgmtvm                 allow target=dom0
+```
+
+Create a policy file at `/etc/qubes/policy.d/30-ansible.policy` with the 
+following content:
+```
+admin.vm.Create.AppVM        * mgmtvm dom0                   allow
+admin.vm.Create.StandaloneVM * mgmtvm dom0                   allow
+admin.vm.Create.TemplateVM   * mgmtvm dom0                   allow
+admin.vm.Remove              * mgmtvm @tag:created-by-mgmtvm allow target=dom0
+```
+
 ## License
 
 This project is licensed under the GPLv3+ license. Please see the [LICENSE](LICENSE) file for the full license text.
