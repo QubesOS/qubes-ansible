@@ -1,3 +1,11 @@
+qubes-ansible-vm (1.2.9-1) unstable; urgency=medium
+
+  [ Guillaume Chinal ]
+  * fix: state of a non-existing vm should be absent
+  * doc: restore policies rules doc for ManagementVM
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Wed, 11 Feb 2026 04:38:54 +0100
+
 qubes-ansible-vm (1.2.8-1) unstable; urgency=medium
 
   [ TheVamp ]
