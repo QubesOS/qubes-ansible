@@ -1,0 +1,59 @@
+#!/usr/bin/python3
+#
+# The Qubes OS Project, https://www.qubes-os.org/
+#
+# Copyright (C) 2026 Guillaume Chinal <guiiix@invisiblethingslab.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+import fcntl
+import os
+import re
+import sys
+
+
+DISPVM_NAME_MAXLEN = 31
+QUBES_ANSIBLE_POLICY_FILE = "/run/qubes/policy.d/30-qubes-ansible.policy"
+
+
+def main(argv):
+    if len(argv) != 1:
+        print("no argument expected", file=sys.stderr)
+        exit(1)
+
+    target = os.environ["QREXEC_REQUESTED_TARGET"]
+    target_mgmt_dispvm = f"disp-mgmt-{target}"[:DISPVM_NAME_MAXLEN]
+
+    with open(QUBES_ANSIBLE_POLICY_FILE, "a+") as pol_file:
+        fcntl.lockf(pol_file.fileno(), fcntl.LOCK_EX)
+        pol_file.seek(0)
+        new_file_lines = [
+            line
+            for line in pol_file.readlines()
+            if not re.match(
+                rf"^\s*\S+\s+\S+\s+{re.escape(target_mgmt_dispvm)}\s+",
+                line,
+            )
+        ]
+        pol_file.seek(0)
+        pol_file.truncate()
+        pol_file.write("".join(new_file_lines))
+        pol_file.flush()
+        os.fsync(pol_file.fileno())
+
+
+if __name__ == '__main__':
+    main(sys.argv)

@@ -21,6 +21,7 @@ import multiprocessing
 import os
 import re
 import shutil
+import subprocess
 import tarfile
 import tempfile
 import traceback
@@ -73,8 +74,7 @@ RPC_SYS_POLICY_FILES = (
     Path("/etc/qubes/policy.d/include/admin-local-rwx"),
     Path("/etc/qubes/policy.d/include/admin-global-ro"),
 )
-RPC_INCLUDE_POL_FILE = Path("/etc/qubes/policy.d/include/qubes-ansible")
-RPC_ANSIBLE_POL_FILE = Path("/etc/qubes/policy.d/30-qubes-ansible.policy")
+
 DISPVM_NAME_MAXLEN = 31
 
 
@@ -313,50 +313,23 @@ class QubesPlayExecutor:
             shutil.copytree(role_path, dest_roles_path / role_path.name)
 
     def _add_rpc_policies(self):
-        src = self.dispvm_mgmt_name
-        dst = self.vm.name
+        self._call_ansible_service_rpc("ansible.CreateManagementPolicies")
 
-        while True:
-            with RPC_INCLUDE_POL_FILE.open("a+") as pol_file:
-                fcntl.lockf(pol_file.fileno(), fcntl.LOCK_EX)
-                try:
-                    if os.fstat(pol_file.fileno()) != os.stat(
-                        RPC_INCLUDE_POL_FILE
-                    ):
-                        continue
-                except FileNotFoundError:
-                    continue
+    def _call_ansible_service_rpc(self, service_name):
+        env = os.environ.copy()
+        # dom0
+        if os.path.exists("/usr/bin/qrexec-client"):
+            env["QREXEC_REQUESTED_TARGET"] = self.vm.name
+            command = [f"/etc/qubes-rpc/{service_name}"]
+        else:
+            command = [
+                "/usr/bin/qrexec-client-vm",
+                "--",
+                self.vm.name,
+                service_name,
+            ]
 
-                pol_file.write(f"{src} {dst} allow target=dom0\n")
-                try:
-                    shutil.chown(RPC_INCLUDE_POL_FILE, group="qubes")
-                except PermissionError:
-                    pass
-            break
-
-        while True:
-            with RPC_ANSIBLE_POL_FILE.open("a+") as pol_file:
-                fcntl.lockf(pol_file.fileno(), fcntl.LOCK_EX)
-                try:
-                    if os.fstat(pol_file.fileno()) != os.stat(
-                        RPC_ANSIBLE_POL_FILE
-                    ):
-                        continue
-                except FileNotFoundError:
-                    continue
-
-                pol_file.write(
-                    f"qubes.Filecopy       * {src} {dst} allow\n"
-                    f"qubes.WaitForSession * {src} {dst} allow\n"
-                    f"qubes.VMShell        * {src} {dst} allow\n"
-                    f"qubes.VMRootShell    * {src} {dst} allow\n"
-                    f"admin.vm.List        * {src} dom0  allow\n"
-                )
-                try:
-                    shutil.chown(RPC_ANSIBLE_POL_FILE, group="qubes")
-                except PermissionError:
-                    pass
-            break
+        return subprocess.check_output(command, env=env).decode()
 
     @staticmethod
     def _build_ansible_args():
@@ -400,44 +373,7 @@ class QubesPlayExecutor:
             )[0]
 
     def _remove_rpc_policies(self):
-        src = self.dispvm_mgmt_name
-        dst = self.vm.name
-
-        with RPC_INCLUDE_POL_FILE.open("a+") as pol_file:
-            fcntl.lockf(pol_file.fileno(), fcntl.LOCK_EX)
-            with suppress(FileNotFoundError):
-                os.stat(RPC_INCLUDE_POL_FILE)
-                pol_file.seek(0)
-                new_file_lines = [
-                    line
-                    for line in pol_file.readlines()
-                    if not re.match(
-                        rf"^\s*{re.escape(src)}\s+{re.escape(dst)}\s+",
-                        line,
-                    )
-                ]
-            pol_file.seek(0)
-            pol_file.truncate()
-            pol_file.write("".join(new_file_lines))
-            pol_file.flush()
-
-        with RPC_ANSIBLE_POL_FILE.open("a+") as pol_file:
-            fcntl.lockf(pol_file.fileno(), fcntl.LOCK_EX)
-            with suppress(FileNotFoundError):
-                pol_file.seek(0)
-                os.stat(RPC_ANSIBLE_POL_FILE)
-                new_file_lines = [
-                    line
-                    for line in pol_file.readlines()
-                    if not re.match(
-                        rf"^\s*\S+\s+\S+\s+{re.escape(src)}\s+",
-                        line,
-                    )
-                ]
-                pol_file.seek(0)
-                pol_file.truncate()
-                pol_file.write("".join(new_file_lines))
-                pol_file.flush()
+        self._call_ansible_service_rpc("ansible.RemoveManagementPolicies")
 
     def _start_mgmt_disp_vm(self):
         self.vvv("Lookup for dispvm_mgmt")
@@ -564,7 +500,6 @@ class QubesPlayExecutor:
 class StrategyModule(LinearStrategyModule):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._setup_rpc_policies()
 
     def _new_play_iterator_with_hosts(self, iterator, play_context, hosts):
         new_play = iterator._play.copy()
@@ -577,17 +512,6 @@ class StrategyModule(LinearStrategyModule):
             all_vars=self._variable_manager.get_vars(play=new_play),
             start_at_done=self._tqm._start_at_done,
         )
-
-    @staticmethod
-    def _setup_rpc_policies():
-        Path(RPC_INCLUDE_POL_FILE).touch()
-        for policy_file in RPC_SYS_POLICY_FILES:
-            policy_lines = [
-                line.strip() for line in policy_file.read_text().split("\n")
-            ]
-            if "!include include/qubes-ansible" not in policy_lines:
-                with policy_file.open("a") as policy_fd:
-                    policy_fd.write("!include include/qubes-ansible\n")
 
     @staticmethod
     def collect_error(error):
