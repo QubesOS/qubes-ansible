@@ -1,0 +1,45 @@
+#!/usr/bin/python3
+#
+# The Qubes OS Project, https://www.qubes-os.org/
+#
+# Copyright (C) 2026 Guillaume Chinal <guiiix@invisiblethingslab.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+import os
+import sys
+import time
+
+
+DISPVM_NAME_MAXLEN = 31
+
+
+def main(argv):
+    if len(argv) != 1:
+        print("no argument expected", file=sys.stderr)
+        exit(1)
+
+    target = os.environ["QREXEC_REQUESTED_TARGET"]
+    target_mgmt_dispvm = f"disp-mgmt-{target}"[:DISPVM_NAME_MAXLEN]
+
+    start = time.time()
+    while os.path.exists(f"/var/lib/qubes/appvms/{target_mgmt_dispvm}"):
+        if time.time() - start >= 30:
+            raise TimeoutError
+        time.sleep(0.5)
+
+if __name__ == '__main__':
+    main(sys.argv)

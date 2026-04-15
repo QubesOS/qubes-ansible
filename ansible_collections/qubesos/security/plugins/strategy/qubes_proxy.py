@@ -130,6 +130,23 @@ def filter_control_chars(text: bytes):
     return new_buff
 
 
+async def wait_for_domain_removal(vm):
+    """Helper function to wait for domain removal.
+
+    :param vm: VM to wait for removal on
+    """
+
+    def interrupt_on_vm_removal(dvm, dispatcher, _, event, **kwargs):
+        if event == "domain-delete" and dvm == kwargs.get("vm"):
+            dispatcher.stop()
+
+    events = qubesadmin.events.EventsDispatcher(vm.app, enable_cache=False)
+    events.add_handler(
+        "domain-delete", functools.partial(interrupt_on_vm_removal, vm, events)
+    )
+    await events.listen_for_events()
+
+
 class QubesPlayExecutor:
     """Run plays on a given host through its management disposable VM"""
 
@@ -467,9 +484,7 @@ class QubesPlayExecutor:
                     asyncio.set_event_loop(loop)
                     loop.run_until_complete(
                         asyncio.wait_for(
-                            qubesadmin.events.utils.wait_for_domain_shutdown(
-                                [dispvm]
-                            ),
+                            wait_for_domain_removal(dispvm),
                             dispvm.shutdown_timeout,
                         )
                     )
@@ -480,6 +495,7 @@ class QubesPlayExecutor:
                         dispvm.kill()
                     except qubesadmin.exc.QubesVMNotStartedError:
                         pass
+            self._call_ansible_service_rpc("ansible.WaitForCleanup")
 
     def _verbose(self, msg: str, level: int):
         getattr(display, "v" * level)(f"<{self.host_name}> {msg}")
