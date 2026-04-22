@@ -59,6 +59,19 @@ options:
       - Only applies to C(shutdown) and C(restarted) states.
     type: bool
     default: false
+  force:
+    description:
+      - If C(true), shut down the target VM regardless of whether other
+        VMs are connected to it (e.g. AppVMs using it as a netvm).
+      - Equivalent to C(qvm-shutdown --force) on the CLI. The target still
+        halts gracefully; only the "connected domains" precondition is
+        skipped. Dependent VMs keep running but lose their uplink until
+        the netvm is started again.
+      - For a hard-kill (equivalent to C(qvm-kill) / SIGKILL of the Xen
+        domain, no graceful shutdown), use C(state=destroyed) instead.
+      - Only applies to C(shutdown) and C(restarted) states.
+    type: bool
+    default: false
   command:
     description:
       - Non-idempotent command to execute on the VM.
@@ -373,14 +386,19 @@ class QubesVirt(object):
             }
         return info
 
-    def shutdown(self, vmname, wait=False):
+    def shutdown(self, vmname, wait=False, force=False):
         """
         Shutdown the specified qube via the given id or name,
         optionally waiting until it halts.
+
+        If ``force`` is True, passes ``force=True`` to
+        ``qubesadmin.vm.QubesVM.shutdown`` so the shutdown proceeds
+        regardless of connected domains (equivalent to
+        ``qvm-shutdown --force``).
         """
         vm = self.get_vm(vmname)
         with suppress(QubesVMNotStartedError):
-            vm.shutdown()
+            vm.shutdown(force=force)
 
         if wait:
             try:
@@ -398,13 +416,14 @@ class QubesVirt(object):
                 )
         return 0
 
-    def restart(self, vmname, wait=False):
+    def restart(self, vmname, wait=False, force=False):
         """
         Restart the specified qube via the given id or name
         by shutting it down (with optional wait) and then starting it.
+        ``force`` is passed through to :meth:`shutdown`.
         """
         try:
-            self.shutdown(vmname, wait=wait)
+            self.shutdown(vmname, wait=wait, force=force)
         except RuntimeError:
             raise
         vm = self.get_vm(vmname)
@@ -992,13 +1011,21 @@ def core(module):
             if current != "shutdown":
                 res["changed"] = True
                 try:
-                    v.shutdown(guest, wait=module.params.get("wait", False))
+                    v.shutdown(
+                        guest,
+                        wait=module.params.get("wait", False),
+                        force=module.params.get("force", False),
+                    )
                 except RuntimeError as e:
                     module.fail_json(msg=str(e))
         elif state == "restarted":
             res["changed"] = True
             try:
-                v.restart(guest, wait=module.params.get("wait", False))
+                v.restart(
+                    guest,
+                    wait=module.params.get("wait", False),
+                    force=module.params.get("force", False),
+                )
                 res["msg"] = "restarted"
             except RuntimeError as e:
                 module.fail_json(msg=str(e))
@@ -1041,6 +1068,7 @@ def main():
                 ],
             ),
             wait=dict(type="bool", default=False),
+            force=dict(type="bool", default=False),
             command=dict(type="str", choices=ALL_COMMANDS),
             label=dict(type="str", default="red"),
             vmtype=dict(type="str", default="AppVM"),
