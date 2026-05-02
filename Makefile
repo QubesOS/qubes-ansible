@@ -12,7 +12,8 @@ install-common:
 	# Legacy files
 	mkdir -p $(DESTDIR)/usr/share/ansible/plugins/connection
 	mkdir -p $(DESTDIR)/usr/share/ansible/plugins/modules
-	cp -P plugins/connection/qubes.py $(DESTDIR)/usr/share/ansible/plugins/connection/qubes.py
+	ln -s ../../collections/ansible_collections/qubesos/core/plugins/connection/qubes.py \
+		$(DESTDIR)/usr/share/ansible/plugins/connection/qubes.py
 	install -m 644 plugins/modules/qubesos.py $(DESTDIR)/usr/share/ansible/plugins/modules/qubesos.py
 
 
@@ -26,8 +27,10 @@ install-dom0:
 
 	mkdir -p $(DESTDIR)/usr/share/ansible/plugins/callback
 	mkdir -p $(DESTDIR)/usr/share/ansible/plugins/strategy
-	cp -P plugins/callback/qubesos_strategy_guard.py $(DESTDIR)/usr/share/ansible/plugins/callback/qubesos_strategy_guard.py
-	cp -P plugins/strategy/qubes_proxy.py $(DESTDIR)/usr/share/ansible/plugins/strategy/qubes_proxy.py
+	ln -s ../../collections/ansible_collections/qubesos/security/plugins/callback/qubesos_strategy_guard.py \
+		$(DESTDIR)/usr/share/ansible/plugins/callback/qubesos_strategy_guard.py
+	ln -s ../../collections/ansible_collections/qubesos/security/plugins/strategy/qubes_proxy.py \
+		$(DESTDIR)/usr/share/ansible/plugins/strategy/qubes_proxy.py
 
 install-tests:
 	mkdir -p $(DESTDIR)/usr/share/ansible/tests/qubes
