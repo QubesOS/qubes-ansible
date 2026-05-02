@@ -1,3 +1,27 @@
+qubes-ansible-vm (1.3.0-1) unstable; urgency=medium
+
+  [ Guillaume Chinal ]
+  * move QubesOS strategy, callback and connection plugins to a
+    collection
+  * split qubesos module into multiple modules
+  * legacy qubesos module should call new modules
+  * rename tests for the legacy module
+  * add tests for new modules
+  * update packaging
+  * add Ansible collections directory to Python path to resolve includes
+  * dedicated security collection for guard and proxy
+  * update documentation
+  * build ansible doc in Gitlab pages
+  * fix comment
+  * don't set properties when not required
+  * fix: convert AssignmentMode enum to string in module returned data
+  * add: support None and empty string values when setting a qube
+    property
+  * fix: don't check for VM existence when specifying itself in a
+    property
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Sat, 02 May 2026 03:34:19 +0200
+
 qubes-ansible-vm (1.2.9-1) unstable; urgency=medium
 
   [ Guillaume Chinal ]
