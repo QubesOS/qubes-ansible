@@ -431,7 +431,7 @@ def core(module):
     guest = module.params.get("name", None)
     command = module.params.get("command", None)
     vmtype = module.params.get("vmtype", None)
-    label = module.params.get("label", "red")
+    label = module.params.get("label", None)
     template = module.params.get("template", None)
     properties = module.params.get("properties", {})
     features = module.params.get("features", {})
@@ -521,7 +521,8 @@ def core(module):
                 for vol in properties_volumes:
                     volumes[vol["name"]] = {"size": vol["size"]}
 
-            # Label is not a module param for the new module
+        # Label is not a module param for the new module
+        if label:
             if not properties:
                 properties = {}
             properties["label"] = label
@@ -663,7 +664,7 @@ def main():
             ),
             wait=dict(type="bool", default=True),
             command=dict(type="str", choices=ALL_COMMANDS),
-            label=dict(type="str", default="red"),
+            label=dict(type="str", default=None),
             vmtype=dict(type="str", default="AppVM"),
             template=dict(type="str", default=None),
             properties=dict(type="dict", default={}),
