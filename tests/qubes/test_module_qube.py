@@ -433,7 +433,7 @@ def test_properties_reset_to_default_netvm(qubes, vm, netvm):
 
     assert (
         fake_module.returned_data["diff"]["before"]["properties"]["netvm"]
-        == default_netvm.name
+        == "*default*"
     )
     assert (
         fake_module.returned_data["diff"]["after"]["properties"]["netvm"]
@@ -485,7 +485,7 @@ def test_properties_reset_to_default_mac(qubes, vm, request):
 
     assert (
         fake_module.returned_data["diff"]["before"]["properties"]["mac"]
-        == default_mac
+        == "*default*"
     )
     assert (
         fake_module.returned_data["diff"]["after"]["properties"]["mac"] == mac
@@ -1109,7 +1109,6 @@ def test_change_properties_should_occur_only_when_necessary(
         "qrexec_timeout": 180,
         "shutdown_timeout": 180,
         "template_for_dispvms": True,
-        "updateable": False,
         "vcpus": 3,
     }
 
@@ -1204,3 +1203,52 @@ def test_create_vm_which_is_its_self_dispvm(vmname, request, qubes):
     )
     QubeModule(fake_module).run()
     assert qubes.domains[vmname].default_dispvm == vmname
+
+
+def test_setting_qube_value_to_the_same_value_than_default(vm):
+    assert vm.property_is_default("autostart")
+    assert vm.autostart == False
+
+    fake_module = Module(
+        {
+            "state": "present",
+            "name": vm.name,
+            "properties": {"autostart": False},
+        }
+    )
+    QubeModule(fake_module).run()
+    assert fake_module.returned_data["changed"]
+    assert (
+        fake_module.returned_data["diff"]["before"]["properties"]["autostart"]
+        == "*default*"
+    )
+    assert (
+        fake_module.returned_data["diff"]["after"]["properties"]["autostart"]
+        == False
+    )
+    assert vm.autostart == False
+    assert not vm.property_is_default("autostart")
+
+    # Idempotence
+    QubeModule(fake_module).run()
+    assert not fake_module.returned_data["changed"]
+
+    fake_module = Module(
+        {
+            "state": "present",
+            "name": vm.name,
+            "properties": {"autostart": "*default*"},
+        }
+    )
+    QubeModule(fake_module).run()
+    assert fake_module.returned_data["changed"]
+    assert (
+        fake_module.returned_data["diff"]["before"]["properties"]["autostart"]
+        == False
+    )
+    assert (
+        fake_module.returned_data["diff"]["after"]["properties"]["autostart"]
+        == "*default*"
+    )
+    assert vm.autostart == False
+    assert vm.property_is_default("autostart")

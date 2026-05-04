@@ -303,7 +303,13 @@ class QubeModule:
 
         for property_name, property_val in self.wants.properties.items():
             try:
-                before_val = getattr(self.qube, property_name)
+                if self.qube.property_is_default(property_name):
+                    if property_val == "*default*":
+                        continue
+                    before_val = "*default*"
+                else:
+                    before_val = getattr(self.qube, property_name)
+
                 # Useful for VMs
                 if hasattr(before_val, "name"):
                     before_val = before_val.name
