@@ -446,20 +446,6 @@ def core(module):
             f"usage of 'wait' parameter in qubesos module is no more supported."
         )
 
-    if state == "present" and guest:
-        try:
-            vm = v.get_vm(guest)
-            vmtype = vm.klass
-        except KeyError:
-            # Set default vmtype to AppVM if vmtype is not provided
-            vmtype = vmtype or "AppVM"
-
-    # Validation
-    try:
-        _validate_properties(guest, v, properties, vmtype)
-    except ValidationFailure as e:
-        return VIRT_FAILED, e.reasons
-
     # gather device facts
     # here, we just need to call the relevant module and retrieve the facts
     if module.params.get("gather_device_facts", False):
@@ -474,10 +460,23 @@ def core(module):
     if state == "present" and guest:
         # Process conversion from legacy module format to new module format
 
+        try:
+            vm = v.get_vm(guest)
+            target_vmtype = vm.klass
+        except KeyError:
+            # Set default vmtype to AppVM if vmtype is not provided
+            target_vmtype = vmtype or "AppVM"
+
+        # Validation
+        try:
+            _validate_properties(guest, v, properties, target_vmtype)
+        except ValidationFailure as e:
+            return VIRT_FAILED, e.reasons
+
         # template / clone_src
         # Legacy module was cloning VMs in those cases
         if (
-            vmtype == "AppVM"
+            vmtype in ["AppVM", None]
             and template
             and v.get_vm(template)._klass == "AppVM"
         ):
@@ -665,7 +664,7 @@ def main():
             wait=dict(type="bool", default=True),
             command=dict(type="str", choices=ALL_COMMANDS),
             label=dict(type="str", default=None),
-            vmtype=dict(type="str", default="AppVM"),
+            vmtype=dict(type="str", default=None),
             template=dict(type="str", default=None),
             properties=dict(type="dict", default={}),
             features=dict(type="dict", default={}),

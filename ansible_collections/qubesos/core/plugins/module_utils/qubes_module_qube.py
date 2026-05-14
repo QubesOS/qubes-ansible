@@ -631,7 +631,7 @@ def main():
             shutdown_if_required=dict(type="bool", default=False),
             tags=dict(type="list", default=[]),
             template=dict(type="str", default=None),
-            klass=dict(type="str", default="AppVM", aliases=["vmtype"]),
+            klass=dict(type="str", default=None, aliases=["vmtype"]),
             volumes=dict(type="dict", default=None),
         ),
     )
