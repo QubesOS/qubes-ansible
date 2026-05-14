@@ -109,9 +109,6 @@ class QubeModule:
             klass=module.params.get("klass"),
         )
 
-        if self.wants.properties is None:
-            self.wants.properties = {}
-
         # Sync template var with template key in properties var
         # No template property for TemplateVMs and StandaloneVMs
         if self.wants.klass not in ("TemplateVM", "StandaloneVM"):
