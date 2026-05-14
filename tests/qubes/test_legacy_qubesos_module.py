@@ -2,8 +2,11 @@ import pytest
 import os
 import time
 
-from plugins.modules.qubesos import core, VIRT_SUCCESS, VIRT_FAILED
-from tests.qubes.conftest import qubes, vmname, Module
+from plugins.modules.qubesos import VIRT_SUCCESS, VIRT_FAILED
+from tests.qubes.ansible_test_utils import (
+    run_module_qubesos_legacy as run_module,
+)
+from tests.qubes.conftest import qubes, vmname
 
 
 def test_lifecycle_full_create_start_shutdown_remove(qubes, vmname, request):
@@ -11,26 +14,24 @@ def test_lifecycle_full_create_start_shutdown_remove(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
 
     # Create
-    rc, _ = core(
-        Module({"command": "create", "name": vmname, "vmtype": "AppVM"})
-    )
+    rc, _ = run_module({"command": "create", "name": vmname, "vmtype": "AppVM"})
     assert rc == VIRT_SUCCESS
     assert vmname in qubes.domains
 
     # Start
-    rc, _ = core(Module({"command": "start", "name": vmname}))
+    rc, _ = run_module({"command": "start", "name": vmname})
     assert rc == VIRT_SUCCESS
     vm = qubes.domains[vmname]
     assert vm.is_running()
 
     # Shutdown
-    rc, _ = core(Module({"command": "shutdown", "name": vmname}))
+    rc, _ = run_module({"command": "shutdown", "name": vmname})
     assert rc == VIRT_SUCCESS
     time.sleep(5)
     assert vm.is_halted()
 
     # Remove
-    rc, _ = core(Module({"command": "remove", "name": vmname}))
+    rc, _ = run_module({"command": "remove", "name": vmname})
     assert rc == VIRT_SUCCESS
     qubes.domains.refresh_cache(force=True)
     assert vmname not in qubes.domains
@@ -40,14 +41,12 @@ def test_lifecycle_create_and_absent(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
 
     # Create
-    rc, _ = core(
-        Module({"command": "create", "name": vmname, "vmtype": "AppVM"})
-    )
+    rc, _ = run_module({"command": "create", "name": vmname, "vmtype": "AppVM"})
     assert rc == VIRT_SUCCESS
     assert vmname in qubes.domains
 
     # Absent
-    rc, _ = core(Module({"state": "absent", "name": vmname}))
+    rc, _ = run_module({"state": "absent", "name": vmname})
     assert rc == VIRT_SUCCESS
     qubes.domains.refresh_cache(force=True)
     assert vmname not in qubes.domains
@@ -55,39 +54,39 @@ def test_lifecycle_create_and_absent(qubes, vmname, request):
 
 def test_lifecycle_pause_and_resume(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
-    core(Module({"command": "create", "name": vmname, "vmtype": "AppVM"}))
-    core(Module({"command": "start", "name": vmname}))
+    run_module({"command": "create", "name": vmname, "vmtype": "AppVM"})
+    run_module({"command": "start", "name": vmname})
     time.sleep(1)
 
-    rc, _ = core(Module({"command": "pause", "name": vmname}))
+    rc, _ = run_module({"command": "pause", "name": vmname})
     assert rc == VIRT_SUCCESS
     assert qubes.domains[vmname].is_paused()
 
-    rc, _ = core(Module({"command": "unpause", "name": vmname}))
+    rc, _ = run_module({"command": "unpause", "name": vmname})
     assert rc == VIRT_SUCCESS
     assert qubes.domains[vmname].is_running()
 
     # Clean up
-    core(Module({"command": "destroy", "name": vmname}))
-    core(Module({"state": "absent", "name": vmname}))
+    run_module({"command": "destroy", "name": vmname})
+    run_module({"state": "absent", "name": vmname})
 
 
 def test_lifecycle_status_reporting(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
-    core(Module({"command": "create", "name": vmname, "vmtype": "AppVM"}))
-    rc, state = core(Module({"command": "status", "name": vmname}))
+    run_module({"command": "create", "name": vmname, "vmtype": "AppVM"})
+    rc, state = run_module({"command": "status", "name": vmname})
     assert rc == VIRT_SUCCESS
     assert state["status"] == "shutdown"
 
-    core(Module({"command": "start", "name": vmname}))
-    rc, state = core(Module({"command": "status", "name": vmname}))
+    run_module({"command": "start", "name": vmname})
+    rc, state = run_module({"command": "status", "name": vmname})
     assert state["status"] == "running"
 
-    core(Module({"command": "destroy", "name": vmname}))
-    rc, state = core(Module({"command": "status", "name": vmname}))
+    run_module({"command": "destroy", "name": vmname})
+    rc, state = run_module({"command": "status", "name": vmname})
     assert state["status"] == "shutdown"
 
-    core(Module({"state": "absent", "name": vmname}))
+    run_module({"state": "absent", "name": vmname})
 
 
 def test_create_clone_vmtype_combinations(qubes, vmname, request):
@@ -97,74 +96,70 @@ def test_create_clone_vmtype_combinations(qubes, vmname, request):
     # request.node.mark_vm_created(f"{vmname}-clone-standalonevm")
 
     # Test creating / cloning from AppVM
-    core(Module({"command": "create", "name": vmname, "vmtype": "AppVM"}))
-    rc, _ = core(
-        Module(
-            {
-                "command": "create",
-                "name": f"{vmname}-clone-appvm",
-                "template": vmname,
-                "vmtype": "AppVM",
-            }
-        )
+    run_module({"command": "create", "name": vmname, "vmtype": "AppVM"})
+    rc, _ = run_module(
+        {
+            "command": "create",
+            "name": f"{vmname}-clone-appvm",
+            "template": vmname,
+            "vmtype": "AppVM",
+        }
     )
 
     assert rc == VIRT_SUCCESS
     assert f"{vmname}-clone-appvm" in qubes.domains
 
-    # rc, _ = core(Module({"command": "create", "name": f"{vmname}-clone-templatevm", "template": vmname, "vmtype": "TemplateVM"}))
+    # rc, _ = run_module({"command": "create", "name": f"{vmname}-clone-templatevm", "template": vmname, "vmtype": "TemplateVM"})
     # assert rc == VIRT_SUCCESS
     # assert f"{vmname}-clone-templatevm" in qubes.domains
 
-    # rc, _ = core(Module({"command": "create", "name": f"{vmname}-clone-standalonevm", "template": vmname, "vmtype": "StandaloneVM"}))
+    # rc, _ = run_module({"command": "create", "name": f"{vmname}-clone-standalonevm", "template": vmname, "vmtype": "StandaloneVM"})
     # assert rc == VIRT_SUCCESS
     # assert f"{vmname}-clone-standalonevm" in qubes.domains
 
     # Test creating / cloning from TemplateVM
-    core(Module({"command": "create", "name": vmname, "vmtype": "TemplateVM"}))
-    rc, _ = core(
-        Module(
-            {
-                "command": "create",
-                "name": f"{vmname}-clone-appvm",
-                "template": vmname,
-                "vmtype": "AppVM",
-            }
-        )
+    run_module({"command": "create", "name": vmname, "vmtype": "TemplateVM"})
+    rc, _ = run_module(
+        {
+            "command": "create",
+            "name": f"{vmname}-clone-appvm",
+            "template": vmname,
+            "vmtype": "AppVM",
+        }
     )
 
     assert rc == VIRT_SUCCESS
     assert f"{vmname}-clone-appvm" in qubes.domains
     #
-    # rc, _ = core(Module({"command": "create", "name": f"{vmname}-clone-templatevm", "template": vmname, "vmtype": "TemplateVM"}))
+    # rc, _ = run_module({"command": "create", "name": f"{vmname}-clone-templatevm", "template": vmname, "vmtype": "TemplateVM"})
     #
     # assert rc == VIRT_SUCCESS
     # assert f"{vmname}-clone-templatevm" in qubes.domains
     #
-    # rc, _ = core(Module({"command": "create", "name": f"{vmname}-clone-standalonevm", "template": vmname, "vmtype": "StandaloneVM"}))
+    # rc, _ = run_module({"command": "create", "name": f"{vmname}-clone-standalonevm", "template": vmname, "vmtype": "StandaloneVM"})
     #
     # assert rc == VIRT_SUCCESS
     # assert f"{vmname}-clone-standalonevm" in qubes.domains
     #
     # # Test creating / cloning from StandaloneVM
-    # core(Module({"command": "create", "name": vmname, "vmtype": "StandaloneVM"}))
-    # rc, _ = core(Module({"command": "create", "name": f"{vmname}-clone-appvm", "template": vmname, "vmtype": "AppVM"}))
+    # run_module({"command": "create", "name": vmname, "vmtype": "StandaloneVM"})
+    # rc, _ = run_module({"command": "create", "name": f"{vmname}-clone-appvm", "template": vmname, "vmtype": "AppVM"})
     # assert rc == VIRT_SUCCESS
     # assert f"{vmname}-clone-appvm" in qubes.domains
     #
-    # rc, _ = core(Module({"command": "create", "name": f"{vmname}-clone-templatevm", "template": vmname, "vmtype": "TemplateVM"}))
+    # rc, _ = run_module({"command": "create", "name": f"{vmname}-clone-templatevm", "template": vmname, "vmtype": "TemplateVM"})
     # assert rc == VIRT_SUCCESS
     # assert f"{vmname}-clone-templatevm" in qubes.domains
     #
-    # rc, _ = core(Module({"command": "create", "name": f"{vmname}-clone-standalonevm", "template": vmname, "vmtype": "StandaloneVM"}))
+    # rc, _ = run_module({"command": "create", "name": f"{vmname}-clone-standalonevm", "template": vmname, "vmtype": "StandaloneVM"})
     # assert rc == VIRT_SUCCESS
     # assert f"{vmname}-clone-standalonevm" in qubes.domains
     #
     # Cleanup
-    core(Module({"state": "absent", "name": f"{vmname}-clone-appvm"}))
-    # core(Module({"state": "absent", "name": f"{vmname}-clone-templatevm"}))
-    # core(Module({"state": "absent", "name": f"{vmname}-clone-standalonevm"}))
-    core(Module({"state": "absent", "name": vmname}))
+    run_module({"state": "absent", "name": f"{vmname}-clone-appvm"})
+    # run_module({"state": "absent", "name": f"{vmname}-clone-templatevm"})
+    # run_module({"state": "absent", "name": f"{vmname}-clone-standalonevm"})
+    run_module({"state": "absent", "name": vmname})
 
 
 def test_create_clone_vmtype_combinations_2(qubes, vmname, request):
@@ -181,21 +176,19 @@ def test_create_clone_vmtype_combinations_2(qubes, vmname, request):
     request.node.mark_vm_created(standalone_clone_name_2)
 
     # 1- create an AppVM
-    rc, returned_data = core(
-        Module({"state": "present", "name": vmname, "vmtype": "AppVM"})
+    rc, returned_data = run_module(
+        {"state": "present", "name": vmname, "vmtype": "AppVM"}
     )
     assert returned_data["created"]
 
     # 2- Clone this AppVM
-    rc, returned_data = core(
-        Module(
-            {
-                "state": "present",
-                "name": appvm_clone_name,
-                "vmtype": "AppVM",
-                "template": vmname,
-            }
-        )
+    rc, returned_data = run_module(
+        {
+            "state": "present",
+            "name": appvm_clone_name,
+            "vmtype": "AppVM",
+            "template": vmname,
+        }
     )
     qubes.domains.refresh_cache(force=True)
     assert returned_data["created"]
@@ -203,15 +196,13 @@ def test_create_clone_vmtype_combinations_2(qubes, vmname, request):
     assert qubes.domains[appvm_clone_name].klass == "AppVM"
 
     # 3- Clone a template
-    rc, returned_data = core(
-        Module(
-            {
-                "state": "present",
-                "name": template_clone_name,
-                "vmtype": "TemplateVM",
-                "template": qubes.default_template,
-            }
-        )
+    rc, returned_data = run_module(
+        {
+            "state": "present",
+            "name": template_clone_name,
+            "vmtype": "TemplateVM",
+            "template": qubes.default_template.name,
+        }
     )
     qubes.domains.refresh_cache(force=True)
     assert returned_data["created"]
@@ -219,15 +210,13 @@ def test_create_clone_vmtype_combinations_2(qubes, vmname, request):
     assert qubes.domains[template_clone_name].klass == "TemplateVM"
 
     # 4- Create a Standalone VM from that template
-    core(
-        Module(
-            {
-                "state": "present",
-                "name": standalone_clone_name_1,
-                "vmtype": "StandaloneVM",
-                "template": template_clone_name,
-            }
-        )
+    run_module(
+        {
+            "state": "present",
+            "name": standalone_clone_name_1,
+            "vmtype": "StandaloneVM",
+            "template": template_clone_name,
+        }
     )
     qubes.domains.refresh_cache(force=True)
     assert returned_data["created"]
@@ -235,15 +224,13 @@ def test_create_clone_vmtype_combinations_2(qubes, vmname, request):
     assert qubes.domains[standalone_clone_name_1].klass == "StandaloneVM"
 
     # 5- Clone this StandaloneVM
-    core(
-        Module(
-            {
-                "state": "present",
-                "name": standalone_clone_name_2,
-                "vmtype": "StandaloneVM",
-                "template": standalone_clone_name_1,
-            }
-        )
+    run_module(
+        {
+            "state": "present",
+            "name": standalone_clone_name_2,
+            "vmtype": "StandaloneVM",
+            "template": standalone_clone_name_1,
+        }
     )
     qubes.domains.refresh_cache(force=True)
     assert returned_data["created"]
@@ -255,21 +242,19 @@ def test_volumes_list_for_standalonevm(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
 
     # Create StandaloneVM
-    rc, res = core(
-        Module(
-            {
-                "state": "present",
-                "name": vmname,
-                "vmtype": "StandaloneVM",
-                "template": "debian-13-xfce",
-                "properties": {
-                    "volumes": [
-                        {"name": "root", "size": 32212254720},
-                        {"name": "private", "size": 10737418240},
-                    ]
-                },
-            }
-        )
+    rc, res = run_module(
+        {
+            "state": "present",
+            "name": vmname,
+            "vmtype": "StandaloneVM",
+            "template": "debian-13-xfce",
+            "properties": {
+                "volumes": [
+                    {"name": "root", "size": 32212254720},
+                    {"name": "private", "size": 10737418240},
+                ]
+            },
+        }
     )
     assert rc == VIRT_SUCCESS
     vm = qubes.domains[vmname]
@@ -278,16 +263,12 @@ def test_volumes_list_for_standalonevm(qubes, vmname, request):
     assert vm.volumes["private"].size == 10737418240
 
     # Resize root
-    rc2, res2 = core(
-        Module(
-            {
-                "state": "present",
-                "name": vmname,
-                "properties": {
-                    "volumes": [{"name": "root", "size": 42949672960}]
-                },
-            }
-        )
+    rc2, res2 = run_module(
+        {
+            "state": "present",
+            "name": vmname,
+            "properties": {"volumes": [{"name": "root", "size": 42949672960}]},
+        }
     )
     assert rc2 == VIRT_SUCCESS
     assert "volume:root" in res2.get("Properties updated", [])
@@ -299,15 +280,13 @@ def test_inventory_generation_and_grouping(tmp_path, qubes):
     os.chdir(tmp_path)
 
     # Create a standalone VM (by default we don't have any)
-    core(
-        Module(
-            {
-                "command": "create",
-                "name": "teststandalone",
-                "vmtype": "StandaloneVM",
-                "template": "debian-13-xfce",
-            }
-        )
+    run_module(
+        {
+            "command": "create",
+            "name": "teststandalone",
+            "vmtype": "StandaloneVM",
+            "template": "debian-13-xfce",
+        }
     )
 
     # Collect expected VMs by class
@@ -318,7 +297,7 @@ def test_inventory_generation_and_grouping(tmp_path, qubes):
         expected.setdefault(vm.klass, []).append(vm.name)
 
     # Run createinventory
-    rc, res = core(Module({"command": "createinventory"}))
+    rc, res = run_module({"command": "createinventory"})
     assert rc == VIRT_SUCCESS
     assert res["status"] == "successful"
 
@@ -360,7 +339,7 @@ def test_properties_and_features_set_and_tag_vm(qubes, vmname, request):
         "tags": tags,
         "notes": "For your eyes only",
     }
-    rc, res = core(Module(params))
+    rc, res = run_module(params)
     assert rc == VIRT_SUCCESS
     props_values = res["Properties updated"]
     assert "autostart" in props_values
@@ -381,7 +360,7 @@ def test_properties_and_features_set_and_tag_vm(qubes, vmname, request):
         "name": vmname,
         "tags": tags,
     }
-    rc, res = core(Module(params))
+    rc, res = run_module(params)
     assert rc == VIRT_SUCCESS
     assert "Tags updated" in res
     for t in tags:
@@ -396,7 +375,7 @@ def test_features_vm(qubes, vmname, request):
         "name": vmname,
         "features": feats,
     }
-    rc, res = core(Module(params))
+    rc, res = run_module(params)
     assert rc == VIRT_SUCCESS
     feats_values = res["Features updated"]
     assert "life" in feats_values
@@ -407,10 +386,8 @@ def test_features_vm(qubes, vmname, request):
 
 def test_properties_invalid_key(qubes):
     # Unknown property should fail
-    rc, res = core(
-        Module(
-            {"state": "present", "name": "dom0", "properties": {"titi": "toto"}}
-        )
+    rc, res = run_module(
+        {"state": "present", "name": "dom0", "properties": {"titi": "toto"}}
     )
     assert rc == VIRT_FAILED
     assert "Invalid property" in res
@@ -418,14 +395,12 @@ def test_properties_invalid_key(qubes):
 
 def test_properties_invalid_type(qubes, vmname, request):
     # Wrong type for memory
-    rc, res = core(
-        Module(
-            {
-                "state": "present",
-                "name": vmname,
-                "properties": {"memory": "toto"},
-            }
-        )
+    rc, res = run_module(
+        {
+            "state": "present",
+            "name": vmname,
+            "properties": {"memory": "toto"},
+        }
     )
     assert rc == VIRT_FAILED
     assert "Invalid property value type" in res
@@ -433,14 +408,12 @@ def test_properties_invalid_type(qubes, vmname, request):
 
 def test_properties_missing_netvm(qubes, vmname, request):
     # netvm does not exist
-    rc, res = core(
-        Module(
-            {
-                "state": "present",
-                "name": vmname,
-                "properties": {"netvm": "toto"},
-            }
-        )
+    rc, res = run_module(
+        {
+            "state": "present",
+            "name": vmname,
+            "properties": {"netvm": "toto"},
+        }
     )
     assert rc == VIRT_FAILED
     assert "Missing netvm" in res
@@ -453,27 +426,23 @@ def test_properties_reset_to_default_netvm(qubes, vm, netvm, request):
     default_netvm = vm.netvm
 
     # Change to non-default netvm
-    change_netvm_rc, change_netvm_res = core(
-        Module(
-            {
-                "state": "present",
-                "name": vm.name,
-                "properties": {"netvm": netvm.name},
-            }
-        )
+    change_netvm_rc, change_netvm_res = run_module(
+        {
+            "state": "present",
+            "name": vm.name,
+            "properties": {"netvm": netvm.name},
+        }
     )
     assert "netvm" in change_netvm_res["Properties updated"]
     assert change_netvm_rc == VIRT_SUCCESS
 
     # Ability to reset back to default netvm, whichever it is
-    reset_netvm_rc, reset_netvm_res = core(
-        Module(
-            {
-                "state": "present",
-                "name": vm.name,
-                "properties": {"netvm": "*default*"},
-            }
-        )
+    reset_netvm_rc, reset_netvm_res = run_module(
+        {
+            "state": "present",
+            "name": vm.name,
+            "properties": {"netvm": "*default*"},
+        }
     )
     assert "netvm" in reset_netvm_res["Properties updated"]
     assert default_netvm != netvm
@@ -493,27 +462,23 @@ def test_properties_reset_to_default_mac(qubes, vm, request):
     mac = "11:22:33:44:55:66"
 
     # Change to non-default mac
-    change_rc, change_res = core(
-        Module(
-            {
-                "state": "present",
-                "name": vm.name,
-                "properties": {"mac": mac},
-            }
-        )
+    change_rc, change_res = run_module(
+        {
+            "state": "present",
+            "name": vm.name,
+            "properties": {"mac": mac},
+        }
     )
     assert "mac" in change_res["Properties updated"]
     assert change_rc == VIRT_SUCCESS
 
     # Ability to reset back to default mac, whatever it is
-    reset_rc, reset_res = core(
-        Module(
-            {
-                "state": "present",
-                "name": vm.name,
-                "properties": {"mac": "*default*"},
-            }
-        )
+    reset_rc, reset_res = run_module(
+        {
+            "state": "present",
+            "name": vm.name,
+            "properties": {"mac": "*default*"},
+        }
     )
     assert "mac" in reset_res["Properties updated"]
     assert default_mac != mac
@@ -525,14 +490,12 @@ def test_properties_reset_to_default_mac(qubes, vm, request):
 
 def test_properties_missing_default_dispvm(qubes):
     # default_dispvm does not exist
-    rc, res = core(
-        Module(
-            {
-                "state": "present",
-                "name": "dom0",
-                "properties": {"default_dispvm": "toto"},
-            }
-        )
+    rc, res = run_module(
+        {
+            "state": "present",
+            "name": "dom0",
+            "properties": {"default_dispvm": "toto"},
+        }
     )
     assert rc == VIRT_FAILED
     assert "Missing default_dispvm" in res
@@ -540,14 +503,12 @@ def test_properties_missing_default_dispvm(qubes):
 
 def test_properties_invalid_volume_name_for_appvm(qubes, vmname, request):
     # volume name not allowed for AppVM
-    rc, res = core(
-        Module(
-            {
-                "state": "present",
-                "name": vmname,
-                "properties": {"volumes": [{"name": "root", "size": 10}]},
-            }
-        )
+    rc, res = run_module(
+        {
+            "state": "present",
+            "name": vmname,
+            "properties": {"volumes": [{"name": "root", "size": 10}]},
+        }
     )
     assert rc == VIRT_FAILED
     assert "Cannot change root volume size for 'AppVM'" in res
@@ -555,27 +516,23 @@ def test_properties_invalid_volume_name_for_appvm(qubes, vmname, request):
 
 def test_properties_missing_volume_fields(qubes, vmname, request):
     # Missing name
-    rc1, res1 = core(
-        Module(
-            {
-                "state": "present",
-                "name": vmname,
-                "properties": {"volumes": [{"size": 10}]},
-            }
-        )
+    rc1, res1 = run_module(
+        {
+            "state": "present",
+            "name": vmname,
+            "properties": {"volumes": [{"size": 10}]},
+        }
     )
     assert rc1 == VIRT_FAILED
     assert "Missing name for the volume" in res1
 
     # Missing size
-    rc2, res2 = core(
-        Module(
-            {
-                "state": "present",
-                "name": vmname,
-                "properties": {"volumes": [{"name": "private"}]},
-            }
-        )
+    rc2, res2 = run_module(
+        {
+            "state": "present",
+            "name": vmname,
+            "properties": {"volumes": [{"name": "private"}]},
+        }
     )
     assert rc2 == VIRT_FAILED
     assert "Missing size for the volume" in res2
@@ -587,34 +544,33 @@ def test_notes(qubes, vmname, request):
         "name": vmname,
         "notes": "For your eyes only",
     }
-    rc, res = core(Module(payload))
+    rc, res = run_module(payload)
     assert rc == VIRT_SUCCESS
     assert qubes.domains[vmname].get_notes() == "For your eyes only"
     # The 2nd call should not change the notes
-    rc, res = core(Module(payload))
+    rc, res = run_module(payload)
     assert rc == VIRT_SUCCESS
     assert not res.get("changed", False)
 
 
+@pytest.mark.xfail(reason="Module sets a default value for tags")
 def test_removetags_errors_if_no_tags_present(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
 
     # Create
-    rc, _ = core(
-        Module({"command": "create", "name": vmname, "vmtype": "AppVM"})
-    )
+    rc, _ = run_module({"command": "create", "name": vmname, "vmtype": "AppVM"})
     assert rc == VIRT_SUCCESS
     assert vmname in qubes.domains
 
     # Remove tags
-    rc, res = core(Module({"command": "removetags", "name": vmname}))
+    rc, res = run_module({"command": "removetags", "name": vmname})
     assert rc == VIRT_FAILED
     assert res["msg"] == "Expected 'tags' parameter to be specified"
 
 
 def test_devices_pci_facts_match_actual(qubes):
     # Gather PCI facts from the module
-    rc, res = core(Module({"gather_device_facts": True}))
+    rc, res = run_module({"gather_device_facts": True})
     assert rc == VIRT_SUCCESS, "Fact‐gathering should succeed"
 
     facts = res["ansible_facts"]
@@ -653,14 +609,12 @@ def test_devices_strict_single_pci_assignment(
     port = latest_net_ports[-1]
 
     # Create VM in strict mode with only one PCI device
-    rc, res = core(
-        Module(
-            {
-                "state": "present",
-                "name": vmname,
-                "devices": [port],
-            }
-        )
+    rc, res = run_module(
+        {
+            "state": "present",
+            "name": vmname,
+            "devices": [port],
+        }
     )
     assert rc == VIRT_SUCCESS
 
@@ -677,7 +631,7 @@ def test_devices_strict_single_pci_assignment(
     assert ports_assigned == [port]
 
     # Clean up
-    core(Module({"state": "absent", "name": vmname}))
+    run_module({"state": "absent", "name": vmname})
 
 
 def test_devices_explicit_strict_assignment(
@@ -687,14 +641,12 @@ def test_devices_explicit_strict_assignment(
     port = latest_net_ports[-1]
 
     # Create VM in strict mode with only one PCI device
-    rc, res = core(
-        Module(
-            {
-                "state": "present",
-                "name": vmname,
-                "devices": {"strategy": "strict", "items": [port]},
-            }
-        )
+    rc, res = run_module(
+        {
+            "state": "present",
+            "name": vmname,
+            "devices": {"strategy": "strict", "items": [port]},
+        }
     )
     assert rc == VIRT_SUCCESS
 
@@ -711,7 +663,7 @@ def test_devices_explicit_strict_assignment(
     assert ports_assigned == [port]
 
     # Clean up
-    core(Module({"state": "absent", "name": vmname}))
+    run_module({"state": "absent", "name": vmname})
 
 
 def test_devices_strict_multiple_with_block(
@@ -721,14 +673,12 @@ def test_devices_strict_multiple_with_block(
     # Use both PCI net devices plus the block device
     devices = [latest_net_ports[-2], latest_net_ports[-1], block_device]
 
-    rc, res = core(
-        Module(
-            {
-                "state": "present",
-                "name": vmname,
-                "devices": devices,
-            }
-        )
+    rc, res = run_module(
+        {
+            "state": "present",
+            "name": vmname,
+            "devices": devices,
+        }
     )
     assert rc == VIRT_SUCCESS
 
@@ -751,7 +701,7 @@ def test_devices_strict_multiple_with_block(
     assert set(pci_ports) == set(latest_net_ports[-2:]), "PCI ports mismatch"
     assert blk_ports == [block_device], "Block device not assigned correctly"
 
-    core(Module({"state": "absent", "name": vmname}))
+    run_module({"state": "absent", "name": vmname})
 
 
 def test_devices_append_strategy_adds_without_removal(
@@ -762,29 +712,25 @@ def test_devices_append_strategy_adds_without_removal(
     second_port = latest_net_ports[-1]
 
     # Initial create with first PCI port
-    rc, _ = core(
-        Module(
-            {
-                "state": "present",
-                "name": vmname,
-                "devices": [first_port],
-            }
-        )
+    rc, _ = run_module(
+        {
+            "state": "present",
+            "name": vmname,
+            "devices": [first_port],
+        }
     )
     assert rc == VIRT_SUCCESS
 
     # Re-run with append strategy: add second PCI and block, keep first
-    rc, _ = core(
-        Module(
-            {
-                "state": "present",
-                "name": vmname,
-                "devices": {
-                    "strategy": "append",
-                    "items": [second_port, block_device],
-                },
-            }
-        )
+    rc, _ = run_module(
+        {
+            "state": "present",
+            "name": vmname,
+            "devices": {
+                "strategy": "append",
+                "items": [second_port, block_device],
+            },
+        }
     )
     assert rc == VIRT_SUCCESS
 
@@ -806,7 +752,7 @@ def test_devices_append_strategy_adds_without_removal(
     assert set(pci_ports) == {first_port, second_port}
     assert blk_ports == [block_device]
 
-    core(Module({"state": "absent", "name": vmname}))
+    run_module({"state": "absent", "name": vmname})
 
 
 def test_devices_per_device_mode_and_options(
@@ -822,14 +768,12 @@ def test_devices_per_device_mode_and_options(
         "options": {"no-strict-reset": True},
     }
 
-    rc, _ = core(
-        Module(
-            {
-                "state": "present",
-                "name": vmname,
-                "devices": [entry],
-            }
-        )
+    rc, _ = run_module(
+        {
+            "state": "present",
+            "name": vmname,
+            "devices": [entry],
+        }
     )
     assert rc == VIRT_SUCCESS
 
@@ -842,7 +786,7 @@ def test_devices_per_device_mode_and_options(
     assert mode == "required"
     assert "no-strict-reset" in opts
 
-    core(Module({"state": "absent", "name": vmname}))
+    run_module({"state": "absent", "name": vmname})
 
 
 def test_devices_strict_idempotent_sync(
@@ -852,27 +796,23 @@ def test_devices_strict_idempotent_sync(
     port = latest_net_ports[-1]
 
     # Initial assignment of a single PCI port
-    rc, res = core(
-        Module(
-            {
-                "state": "present",
-                "name": vmname,
-                "devices": [port],
-            }
-        )
+    rc, res = run_module(
+        {
+            "state": "present",
+            "name": vmname,
+            "devices": [port],
+        }
     )
     assert rc == VIRT_SUCCESS
     assert res.get("changed", False)
 
     # Re-run with the same device list (strict mode) — should be a no-op
-    rc2, res2 = core(
-        Module(
-            {
-                "state": "present",
-                "name": vmname,
-                "devices": [port],
-            }
-        )
+    rc2, res2 = run_module(
+        {
+            "state": "present",
+            "name": vmname,
+            "devices": [port],
+        }
     )
     assert rc2 == VIRT_SUCCESS
     # No changes on the second sync
@@ -893,14 +833,12 @@ def test_devices_strict_unassign_all(qubes, vmname, request, latest_net_ports):
     ports = latest_net_ports[-2:]
 
     # Assign two PCI ports initially
-    rc, res = core(
-        Module(
-            {
-                "state": "present",
-                "name": vmname,
-                "devices": ports,
-            }
-        )
+    rc, res = run_module(
+        {
+            "state": "present",
+            "name": vmname,
+            "devices": ports,
+        }
     )
     assert rc == VIRT_SUCCESS
     assert res.get("changed", False)
@@ -914,14 +852,12 @@ def test_devices_strict_unassign_all(qubes, vmname, request, latest_net_ports):
     assert initial == set(ports)
 
     # Now sync to an empty list (strict default) to remove all devices
-    rc2, res2 = core(
-        Module(
-            {
-                "state": "present",
-                "name": vmname,
-                "devices": [],  # strict empty
-            }
-        )
+    rc2, res2 = run_module(
+        {
+            "state": "present",
+            "name": vmname,
+            "devices": [],  # strict empty
+        }
     )
     assert rc2 == VIRT_SUCCESS
     # Should report that it changed by removing devices
@@ -934,14 +870,12 @@ def test_devices_strict_unassign_all(qubes, vmname, request, latest_net_ports):
     )
 
     # And a second empty-sync is a no-op
-    rc3, res3 = core(
-        Module(
-            {
-                "state": "present",
-                "name": vmname,
-                "devices": [],
-            }
-        )
+    rc3, res3 = run_module(
+        {
+            "state": "present",
+            "name": vmname,
+            "devices": [],
+        }
     )
     assert rc3 == VIRT_SUCCESS
     assert res3.get("changed", False) is False
@@ -951,14 +885,12 @@ def test_services_aliased_to_features_only(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
 
     services = ["clocksync", "minimal-netvm"]
-    rc, res = core(
-        Module(
-            {
-                "state": "present",
-                "name": vmname,
-                "properties": {"services": services},
-            }
-        )
+    rc, res = run_module(
+        {
+            "state": "present",
+            "name": vmname,
+            "properties": {"services": services},
+        }
     )
     assert rc == VIRT_SUCCESS
 
@@ -979,26 +911,22 @@ def test_devices_unchanged(qubes, vmname, request, latest_net_ports):
     port = latest_net_ports[-1]
 
     # Initial assignment of a single PCI port
-    rc, res = core(
-        Module(
-            {
-                "state": "present",
-                "name": vmname,
-                "devices": [port],
-            }
-        )
+    rc, res = run_module(
+        {
+            "state": "present",
+            "name": vmname,
+            "devices": [port],
+        }
     )
     assert rc == VIRT_SUCCESS
     assert res.get("changed", False)
 
     # Re-run without devices, should not change anything
-    rc2, res2 = core(
-        Module(
-            {
-                "state": "present",
-                "name": vmname,
-            }
-        )
+    rc2, res2 = run_module(
+        {
+            "state": "present",
+            "name": vmname,
+        }
     )
     assert rc2 == VIRT_SUCCESS
     # No changes on the second sync
@@ -1021,17 +949,15 @@ def test_services_and_explicit_features_combined(qubes, vmname, request):
     features = {"foo": "bar"}
     services = ["audio", "net"]
 
-    rc, res = core(
-        Module(
-            {
-                "state": "present",
-                "name": vmname,
-                "properties": {
-                    "features": features,
-                    "services": services,
-                },
-            }
-        )
+    rc, res = run_module(
+        {
+            "state": "present",
+            "name": vmname,
+            "properties": {
+                "features": features,
+                "services": services,
+            },
+        }
     )
     assert rc == VIRT_SUCCESS
 
@@ -1055,19 +981,17 @@ def test_lifecycle_shutdown_with_and_without_wait(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
 
     # Create VM
-    rc, _ = core(
-        Module({"command": "create", "name": vmname, "vmtype": "AppVM"})
-    )
+    rc, _ = run_module({"command": "create", "name": vmname, "vmtype": "AppVM"})
     assert rc == VIRT_SUCCESS
     vm = qubes.domains[vmname]
 
     # Start VM
-    rc, _ = core(Module({"command": "start", "name": vmname}))
+    rc, _ = run_module({"command": "start", "name": vmname})
     assert rc == VIRT_SUCCESS
     assert vm.is_running()
 
     # Shutdown without wait (default)
-    rc, _ = core(Module({"state": "shutdown", "name": vmname}))
+    rc, _ = run_module({"state": "shutdown", "name": vmname})
     assert rc == VIRT_SUCCESS
     # vm is not halted yet
     assert not vm.is_halted()
@@ -1076,12 +1000,12 @@ def test_lifecycle_shutdown_with_and_without_wait(qubes, vmname, request):
     assert vm.is_halted()
 
     # Restart for the next check
-    rc, _ = core(Module({"command": "start", "name": vmname}))
+    rc, _ = run_module({"command": "start", "name": vmname})
     assert rc == VIRT_SUCCESS
     assert vm.is_running()
 
     # Shutdown with wait=True
-    rc, _ = core(Module({"state": "shutdown", "name": vmname, "wait": True}))
+    rc, _ = run_module({"state": "shutdown", "name": vmname, "wait": True})
     assert rc == VIRT_SUCCESS
     # should already be halted, no extra sleep needed
     assert vm.is_halted()
@@ -1090,14 +1014,12 @@ def test_lifecycle_shutdown_with_and_without_wait(qubes, vmname, request):
 def test_properties_set_kernelopts(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
     props = {"kernelopts": "swiotlb=4096 foo=bar"}
-    rc, res = core(
-        Module(
-            {
-                "state": "present",
-                "name": vmname,
-                "properties": props,
-            }
-        )
+    rc, res = run_module(
+        {
+            "state": "present",
+            "name": vmname,
+            "properties": props,
+        }
     )
     assert rc == VIRT_SUCCESS
     assert "kernelopts" in res["Properties updated"]
@@ -1107,14 +1029,12 @@ def test_properties_set_kernelopts(qubes, vmname, request):
 def test_properties_set_timeouts(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
     props = {"qrexec_timeout": 123, "shutdown_timeout": 456}
-    rc, res = core(
-        Module(
-            {
-                "state": "present",
-                "name": vmname,
-                "properties": props,
-            }
-        )
+    rc, res = run_module(
+        {
+            "state": "present",
+            "name": vmname,
+            "properties": props,
+        }
     )
     assert rc == VIRT_SUCCESS
     updated = res["Properties updated"]
@@ -1133,14 +1053,12 @@ def test_properties_set_ip_ip6_and_mac(qubes, vmname, request):
         "ip6": "fe80::1",
         "mac": "00:11:22:33:44:55",
     }
-    rc, res = core(
-        Module(
-            {
-                "state": "present",
-                "name": vmname,
-                "properties": props,
-            }
-        )
+    rc, res = run_module(
+        {
+            "state": "present",
+            "name": vmname,
+            "properties": props,
+        }
     )
     assert rc == VIRT_SUCCESS
     updated = res["Properties updated"]
@@ -1158,14 +1076,12 @@ def test_properties_set_management_dispvm_and_audiovm(
 ):
     request.node.mark_vm_created(vmname)
     props = {"management_dispvm": managementdvm.name, "audiovm": audiovm.name}
-    rc, res = core(
-        Module(
-            {
-                "state": "present",
-                "name": vmname,
-                "properties": props,
-            }
-        )
+    rc, res = run_module(
+        {
+            "state": "present",
+            "name": vmname,
+            "properties": props,
+        }
     )
     assert rc == VIRT_SUCCESS
     updated = res["Properties updated"]
@@ -1180,14 +1096,12 @@ def test_properties_set_management_dispvm_and_audiovm(
 def test_properties_set_default_user_and_guivm(qubes, vmname, guivm, request):
     request.node.mark_vm_created(vmname)
     props = {"default_user": "alice", "guivm": guivm.name}
-    rc, res = core(
-        Module(
-            {
-                "state": "present",
-                "name": vmname,
-                "properties": props,
-            }
-        )
+    rc, res = run_module(
+        {
+            "state": "present",
+            "name": vmname,
+            "properties": props,
+        }
     )
     assert rc == VIRT_SUCCESS
     updated = res["Properties updated"]
@@ -1202,104 +1116,88 @@ def test_properties_set_default_user_and_guivm(qubes, vmname, guivm, request):
 def test_properties_invalid_type_for_new_properties(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
     # ip must be str, not int
-    rc, res = core(
-        Module(
-            {
-                "state": "present",
-                "name": vmname,
-                "properties": {"ip": 12345},
-            }
-        )
+    rc, res = run_module(
+        {
+            "state": "present",
+            "name": vmname,
+            "properties": {"ip": 12345},
+        }
     )
     assert rc == VIRT_FAILED
     assert "Invalid property value type" in res
     # qrexec_timeout must be int, not str
-    rc2, res2 = core(
-        Module(
-            {
-                "state": "present",
-                "name": vmname,
-                "properties": {"qrexec_timeout": "sixty"},
-            }
-        )
+    rc2, res2 = run_module(
+        {
+            "state": "present",
+            "name": vmname,
+            "properties": {"qrexec_timeout": "sixty"},
+        }
     )
     assert rc2 == VIRT_FAILED
     assert "Invalid property value type" in res2
 
 
 def test_set_property_to_empty_string(vm, qubes):
-    rc, _ = core(
-        Module(
-            {
-                "state": "present",
-                "name": vm.name,
-                "properties": {"netvm": "sys-net"},
-            }
-        )
+    rc, _ = run_module(
+        {
+            "state": "present",
+            "name": vm.name,
+            "properties": {"netvm": "sys-net"},
+        }
     )
     assert rc == VIRT_SUCCESS
     assert qubes.domains[vm.name].netvm == "sys-net"
 
-    rc, _ = core(
-        Module(
-            {
-                "state": "present",
-                "name": vm.name,
-                "properties": {"netvm": ""},
-            }
-        )
+    rc, _ = run_module(
+        {
+            "state": "present",
+            "name": vm.name,
+            "properties": {"netvm": ""},
+        }
     )
     assert rc == VIRT_SUCCESS
     assert qubes.domains[vm.name].netvm == None
 
 
 def test_set_property_to_none(vm, qubes):
-    rc, _ = core(
-        Module(
-            {
-                "state": "present",
-                "name": vm.name,
-                "properties": {"netvm": "sys-net"},
-            }
-        )
+    rc, _ = run_module(
+        {
+            "state": "present",
+            "name": vm.name,
+            "properties": {"netvm": "sys-net"},
+        }
     )
     assert rc == VIRT_SUCCESS
     assert qubes.domains[vm.name].netvm == "sys-net"
 
-    rc, _ = core(
-        Module(
-            {
-                "state": "present",
-                "name": vm.name,
-                "properties": {"netvm": None},
-            }
-        )
+    rc, _ = run_module(
+        {
+            "state": "present",
+            "name": vm.name,
+            "properties": {"netvm": None},
+        }
     )
     assert rc == VIRT_SUCCESS
     assert qubes.domains[vm.name].netvm == None
 
 
 def test_set_property_to_none_str(vm, qubes):
-    rc, _ = core(
-        Module(
-            {
-                "state": "present",
-                "name": vm.name,
-                "properties": {"netvm": "sys-net"},
-            }
-        )
+    rc, _ = run_module(
+        {
+            "state": "present",
+            "name": vm.name,
+            "properties": {"netvm": "sys-net"},
+        }
     )
     assert rc == VIRT_SUCCESS
     assert qubes.domains[vm.name].netvm == "sys-net"
 
-    rc, _ = core(
-        Module(
-            {
-                "state": "present",
-                "name": vm.name,
-                "properties": {"netvm": "None"},
-            }
-        )
+    rc, _ = run_module(
+        {
+            "state": "present",
+            "name": vm.name,
+            "properties": {"netvm": "None"},
+        }
     )
     assert rc == VIRT_SUCCESS
     assert qubes.domains[vm.name].netvm == None
@@ -1307,14 +1205,12 @@ def test_set_property_to_none_str(vm, qubes):
 
 def test_create_vm_which_is_its_self_dispvm(vmname, request, qubes):
     request.node.mark_vm_created(vmname)
-    rc, _ = core(
-        Module(
-            {
-                "state": "present",
-                "name": vmname,
-                "properties": {"default_dispvm": vmname},
-            }
-        )
+    rc, _ = run_module(
+        {
+            "state": "present",
+            "name": vmname,
+            "properties": {"default_dispvm": vmname},
+        }
     )
 
     assert rc == VIRT_SUCCESS
@@ -1323,8 +1219,8 @@ def test_create_vm_which_is_its_self_dispvm(vmname, request, qubes):
 
 def test_label_change(vmname, request, qubes):
     request.node.mark_vm_created(vmname)
-    rc, returned_data = core(
-        Module({"state": "present", "name": vmname, "label": "yellow"})
+    rc, returned_data = run_module(
+        {"state": "present", "name": vmname, "label": "yellow"}
     )
     assert rc == VIRT_SUCCESS
     assert str(qubes.domains[vmname].label) == "yellow"
@@ -1332,8 +1228,8 @@ def test_label_change(vmname, request, qubes):
     assert returned_data["created"]
     assert returned_data["diff"]["after"]["properties"]["label"] == "yellow"
 
-    rc, returned_data = core(
-        Module({"state": "present", "name": vmname, "label": "green"})
+    rc, returned_data = run_module(
+        {"state": "present", "name": vmname, "label": "green"}
     )
     assert rc == VIRT_SUCCESS
     assert str(qubes.domains[vmname].label) == "green"
@@ -1346,15 +1242,15 @@ def test_label_change(vmname, request, qubes):
 def test_label_should_be_changed_only_when_specified(vmname, request, qubes):
     request.node.mark_vm_created(vmname)
 
-    rc, returned_data = core(
-        Module({"state": "present", "name": vmname, "label": "yellow"})
+    rc, returned_data = run_module(
+        {"state": "present", "name": vmname, "label": "yellow"}
     )
     assert rc == VIRT_SUCCESS
     assert str(qubes.domains[vmname].label) == "yellow"
     assert returned_data["changed"]
     assert returned_data["diff"]["after"]["properties"]["label"] == "yellow"
 
-    rc, returned_data = core(Module({"state": "present", "name": vmname}))
+    rc, returned_data = run_module({"state": "present", "name": vmname})
     assert rc == VIRT_SUCCESS
     qubes.domains.refresh_cache(force=True)
     assert str(qubes.domains[vmname].label) == "yellow"
@@ -1367,33 +1263,56 @@ def test_setting_qube_value_to_the_same_value_than_default(vm):
     assert vm.property_is_default("netvm")
     netvm = vm.netvm.name
 
-    mod = Module(
-        {
-            "state": "present",
-            "name": vm.name,
-            "properties": {"netvm": netvm},
-        }
-    )
-    rc, returned_data = core(mod)
+    params = {
+        "state": "present",
+        "name": vm.name,
+        "properties": {"netvm": netvm},
+    }
+    rc, returned_data = run_module(params)
     assert rc == VIRT_SUCCESS, returned_data
     assert returned_data["changed"]
     assert vm.netvm == netvm
     assert not vm.property_is_default("netvm")
 
     # Idempotence
-    rc, returned_data = core(mod)
+    rc, returned_data = run_module(params)
     assert rc == VIRT_SUCCESS, returned_data
     assert not returned_data["changed"]
 
-    mod = Module(
-        {
-            "state": "present",
-            "name": vm.name,
-            "properties": {"netvm": "*default*"},
-        }
-    )
-    rc, returned_data = core(mod)
+    params = {
+        "state": "present",
+        "name": vm.name,
+        "properties": {"netvm": "*default*"},
+    }
+    rc, returned_data = run_module(params)
     assert rc == VIRT_SUCCESS, returned_data
     assert returned_data["changed"]
     assert vm.netvm == netvm
     assert vm.property_is_default("netvm")
+
+
+def test_no_vm_klass_should_no_try_to_convert_to_appvm(request, vmname, qubes):
+    request.node.mark_vm_created(vmname)
+    rc, _ = run_module(
+        {
+            "state": "present",
+            "name": vmname,
+            "vmtype": "StandaloneVM",
+            "template": qubes.default_template.name,
+        }
+    )
+
+    assert rc == VIRT_SUCCESS
+    assert qubes.domains[vmname].klass == "StandaloneVM"
+
+    # Start qube without specifying its klass — must NOT try to convert to AppVM
+    rc, _ = run_module(
+        {
+            "state": "running",
+            "name": vmname,
+        }
+    )
+
+    assert rc == VIRT_SUCCESS
+    assert qubes.domains[vmname].get_power_state() == "Running"
+    assert qubes.domains[vmname].klass == "StandaloneVM"

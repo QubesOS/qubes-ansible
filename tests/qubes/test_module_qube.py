@@ -1,11 +1,9 @@
-import os
 import pytest
-import time
 
-from ansible_collections.qubesos.core.plugins.module_utils.qubes_module_qube import (
-    QubeModule,
+from tests.qubes.ansible_test_utils import (
+    AnsibleFailJson,
+    run_module_qubesos_core_qube_main as run_module,
 )
-from tests.qubes.conftest import qubes, vmname, Module, ModuleExitWithError
 
 
 def test_lifecycle_full_create_start_shutdown_remove(qubes, vmname, request):
@@ -13,59 +11,55 @@ def test_lifecycle_full_create_start_shutdown_remove(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
 
     # Create
-    fake_module = Module({"state": "present", "name": vmname, "klass": "AppVM"})
-    QubeModule(fake_module).run()
+    result = run_module({"state": "present", "name": vmname, "klass": "AppVM"})
 
-    assert fake_module.returned_data.get("changed")
+    assert result.get("changed")
     assert vmname in qubes.domains
     assert qubes.domains[vmname].is_halted()
-    assert fake_module.returned_data["created"]
+    assert result["created"]
 
-    fake_module = Module({"state": "running", "name": vmname})
-    QubeModule(fake_module).run()
+    result = run_module({"state": "running", "name": vmname})
     assert qubes.domains[vmname].is_running()
-    assert fake_module.returned_data.get("changed")
+    assert result.get("changed")
 
     # Shutdown
-    fake_module = Module({"state": "halted", "name": vmname})
-    QubeModule(fake_module).run()
+    result = run_module({"state": "halted", "name": vmname})
     assert qubes.domains[vmname].is_halted()
-    assert fake_module.returned_data.get("changed")
+    assert result.get("changed")
 
     # Remove
-    fake_module = Module({"state": "absent", "name": vmname})
-    QubeModule(fake_module).run()
+    result = run_module({"state": "absent", "name": vmname})
     qubes.domains.refresh_cache(force=True)
     assert vmname not in qubes.domains
-    assert fake_module.returned_data.get("changed")
+    assert result.get("changed")
 
 
 def test_lifecycle_create_and_absent(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
 
     # Create
-    fake_module = Module({"state": "present", "name": vmname})
-    QubeModule(fake_module).run()
-    assert fake_module.returned_data.get("changed")
+    result = run_module({"state": "present", "name": vmname})
+    assert result.get("changed")
     assert vmname in qubes.domains
 
     # Absent
-    fake_module = Module({"state": "absent", "name": vmname})
-    QubeModule(fake_module).run()
+    result = run_module({"state": "absent", "name": vmname})
     qubes.domains.refresh_cache(force=True)
     assert vmname not in qubes.domains
-    assert fake_module.returned_data.get("changed")
+    assert result.get("changed")
 
 
 def test_lifecycle_create_running_vm(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
 
-    # Create
-    fake_module = Module(
-        {"state": "running", "name": vmname, "tags": ["a", "b"]}
+    result = run_module(
+        {
+            "state": "running",
+            "name": vmname,
+            "tags": ["a", "b"],
+        }
     )
-    QubeModule(fake_module).run()
-    assert fake_module.returned_data.get("changed")
+    assert result.get("changed")
     assert vmname in qubes.domains
     vm = qubes.domains[vmname]
     assert vm.is_running()
@@ -76,23 +70,19 @@ def test_lifecycle_create_running_vm(qubes, vmname, request):
 def test_lifecycle_pause_and_resume(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
 
-    # create and start
-    fake_module = Module({"state": "running", "name": vmname})
-    QubeModule(fake_module).run()
-    assert fake_module.returned_data.get("changed")
+    result = run_module({"state": "running", "name": vmname})
+    assert result.get("changed")
     assert vmname in qubes.domains
     vm = qubes.domains[vmname]
     assert vm.get_power_state() == "Running"
 
-    fake_module = Module({"state": "paused", "name": vmname})
-    QubeModule(fake_module).run()
-    assert fake_module.returned_data.get("changed")
+    result = run_module({"state": "paused", "name": vmname})
+    assert result.get("changed")
     vm = qubes.domains[vmname]
     assert vm.get_power_state() == "Paused"
 
-    fake_module = Module({"state": "running", "name": vmname})
-    QubeModule(fake_module).run()
-    assert fake_module.returned_data.get("changed")
+    result = run_module({"state": "running", "name": vmname})
+    assert result.get("changed")
     vm = qubes.domains[vmname]
     assert vm.get_power_state() == "Running"
 
@@ -111,12 +101,11 @@ def test_create_clone_vmtype_combinations(qubes, vmname, request):
     request.node.mark_vm_created(standalone_clone_name_2)
 
     # 1- create an AppVM
-    fake_module = Module({"state": "present", "name": vmname, "klass": "AppVM"})
-    QubeModule(fake_module).run()
-    assert fake_module.returned_data["created"]
+    result = run_module({"state": "present", "name": vmname, "klass": "AppVM"})
+    assert result["created"]
 
     # 2- Clone this AppVM
-    fake_module = Module(
+    result = run_module(
         {
             "state": "present",
             "name": appvm_clone_name,
@@ -124,29 +113,27 @@ def test_create_clone_vmtype_combinations(qubes, vmname, request):
             "clone_src": vmname,
         }
     )
-    QubeModule(fake_module).run()
     qubes.domains.refresh_cache(force=True)
-    assert fake_module.returned_data["created"]
+    assert result["created"]
     assert appvm_clone_name in qubes.domains
     assert qubes.domains[appvm_clone_name].klass == "AppVM"
 
     # 3- Clone a template
-    fake_module = Module(
+    result = run_module(
         {
             "state": "present",
             "name": template_clone_name,
             "klass": "TemplateVM",
-            "clone_src": qubes.default_template,
+            "clone_src": qubes.default_template.name,
         }
     )
-    QubeModule(fake_module).run()
     qubes.domains.refresh_cache(force=True)
-    assert fake_module.returned_data["created"]
+    assert result["created"]
     assert template_clone_name in qubes.domains
     assert qubes.domains[template_clone_name].klass == "TemplateVM"
 
     # 4- Create a Standalone VM from that template
-    fake_module = Module(
+    result = run_module(
         {
             "state": "present",
             "name": standalone_clone_name_1,
@@ -154,14 +141,13 @@ def test_create_clone_vmtype_combinations(qubes, vmname, request):
             "clone_src": template_clone_name,
         }
     )
-    QubeModule(fake_module).run()
     qubes.domains.refresh_cache(force=True)
-    assert fake_module.returned_data["created"]
+    assert result["created"]
     assert standalone_clone_name_1 in qubes.domains
     assert qubes.domains[standalone_clone_name_1].klass == "StandaloneVM"
 
     # 5- Clone this StandaloneVM
-    fake_module = Module(
+    result = run_module(
         {
             "state": "present",
             "name": standalone_clone_name_2,
@@ -169,15 +155,14 @@ def test_create_clone_vmtype_combinations(qubes, vmname, request):
             "clone_src": standalone_clone_name_1,
         }
     )
-    QubeModule(fake_module).run()
     qubes.domains.refresh_cache(force=True)
-    assert fake_module.returned_data["created"]
+    assert result["created"]
     assert standalone_clone_name_2 in qubes.domains
     assert qubes.domains[standalone_clone_name_2].klass == "StandaloneVM"
 
     # 6- Last check, we want to clone an AppVM (to the data on the private
     #    volume for example, but we want to use another template)
-    fake_module = Module(
+    result = run_module(
         {
             "state": "present",
             "name": appvm_clone_name_2,
@@ -186,9 +171,8 @@ def test_create_clone_vmtype_combinations(qubes, vmname, request):
             "template": template_clone_name,
         }
     )
-    QubeModule(fake_module).run()
     qubes.domains.refresh_cache(force=True)
-    assert fake_module.returned_data["created"]
+    assert result["created"]
     assert appvm_clone_name_2 in qubes.domains
     vm = qubes.domains[appvm_clone_name_2]
     assert vm.template == qubes.domains[template_clone_name]
@@ -198,19 +182,18 @@ def test_create_clone_vmtype_combinations(qubes, vmname, request):
 def test_volumes_list_for_standalonevm(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
 
-    fake_module = Module(
+    run_module(
         {
             "state": "present",
             "name": vmname,
             "klass": "StandaloneVM",
-            "clone_src": qubes.default_template,
+            "clone_src": qubes.default_template.name,
             "volumes": {
                 "root": {"size": 32212254720},
                 "private": {"size": 10737418240, "revisions_to_keep": 123},
             },
         }
     )
-    QubeModule(fake_module).run()
 
     vm = qubes.domains[vmname]
     assert vm.klass == "StandaloneVM"
@@ -220,7 +203,7 @@ def test_volumes_list_for_standalonevm(qubes, vmname, request):
 
     # Resize root
     # Change revisions to keep
-    fake_module = Module(
+    result = run_module(
         {
             "state": "present",
             "name": vmname,
@@ -232,9 +215,8 @@ def test_volumes_list_for_standalonevm(qubes, vmname, request):
             },
         }
     )
-    QubeModule(fake_module).run()
 
-    assert fake_module.returned_data["diff"] == {
+    assert result["diff"] == {
         "before": {
             "volumes": {
                 "root": {"size": 32212254720},
@@ -266,13 +248,12 @@ def test_properties_and_features_set_and_tag_vm(qubes, vmname, request):
         "tags": tags,
         "notes": "For your eyes only",
     }
-    fake_module = Module(params)
-    QubeModule(fake_module).run()
+    result = run_module(params)
 
     vm = qubes.domains[vmname]
-    props_new_values = fake_module.returned_data["diff"]["after"]["properties"]
-    feats_new_values = fake_module.returned_data["diff"]["after"]["features"]
-    tags_new_values = fake_module.returned_data["diff"]["after"]["tags"]
+    props_new_values = result["diff"]["after"]["properties"]
+    feats_new_values = result["diff"]["after"]["features"]
+    tags_new_values = result["diff"]["after"]["tags"]
 
     assert vm.autostart is True
     assert props_new_values["autostart"] is True
@@ -293,26 +274,23 @@ def test_properties_and_features_set_and_tag_vm(qubes, vmname, request):
         assert t in tags_new_values
 
     assert vm.get_notes() == "For your eyes only"
-    assert (
-        fake_module.returned_data["diff"]["after"]["notes"]
-        == "For your eyes only"
-    )
+    assert result["diff"]["after"]["notes"] == "For your eyes only"
 
     # test if updating tags work
     tags = ["tag3", "tag4"]
-    params = {
-        "state": "present",
-        "name": vmname,
-        "tags": tags,
-    }
-    fake_module = Module(params)
-    QubeModule(fake_module).run()
+    result = run_module(
+        {
+            "state": "present",
+            "name": vmname,
+            "tags": tags,
+        }
+    )
     for t in tags:
         assert t in qubes.domains[vmname].tags
-        assert t not in fake_module.returned_data["diff"]["before"]["tags"]
-        assert t in fake_module.returned_data["diff"]["after"]["tags"]
+        assert t not in result["diff"]["before"]["tags"]
+        assert t in result["diff"]["after"]["tags"]
 
-    fake_module = Module(
+    result = run_module(
         {
             "state": "present",
             "name": vmname,
@@ -322,14 +300,13 @@ def test_properties_and_features_set_and_tag_vm(qubes, vmname, request):
             },
         }
     )
-    QubeModule(fake_module).run()
     assert vm.features.get("life") is None
     assert vm.features.get("dummy_feature") == "set"
-    assert fake_module.returned_data["diff"]["before"]["features"] == {
+    assert result["diff"]["before"]["features"] == {
         "life": "Going on",
         "dummy_feature": None,
     }
-    assert fake_module.returned_data["diff"]["after"]["features"] == {
+    assert result["diff"]["after"]["features"] == {
         "life": None,
         "dummy_feature": "set",
     }
@@ -338,15 +315,14 @@ def test_properties_and_features_set_and_tag_vm(qubes, vmname, request):
 def test_features_vm(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
     feats = {"life": "Going on", "dummy_feature": None}
-    fake_module = Module(
+    result = run_module(
         {
             "state": "present",
             "name": vmname,
             "features": feats,
         }
     )
-    QubeModule(fake_module).run()
-    feats_values = fake_module.returned_data["diff"]["after"]["features"]
+    feats_values = result["diff"]["after"]["features"]
     assert "life" in feats_values
     assert "dummy_feature" not in feats_values
     for feat, value in feats.items():
@@ -354,65 +330,46 @@ def test_features_vm(qubes, vmname, request):
 
 
 def test_properties_invalid_key(qubes):
-    # Unknown property should fail
-    fake_module = Module(
-        {
-            "state": "present",
-            "name": "dom0",
-            "properties": {"titi": "toto"},
-        }
-    )
-
-    try:
-        QubeModule(fake_module).run()
-    except ModuleExitWithError:
-        assert "Invalid property" in fake_module.returned_data["msg"]
-    else:
-        pytest.fail("Module should have raised an error")
+    with pytest.raises(AnsibleFailJson) as exc:
+        run_module(
+            {
+                "state": "present",
+                "name": "dom0",
+                "properties": {"titi": "toto"},
+            }
+        )
+    assert "Invalid property" in exc.value.args[0]["msg"]
 
 
 def test_properties_invalid_type(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
-    # Wrong type for memory
-    fake_module = Module(
-        {
-            "state": "present",
-            "name": vmname,
-            "properties": {"memory": "toto"},
-        }
-    )
-    try:
-        QubeModule(fake_module).run()
-    except ModuleExitWithError:
-        assert (
-            "Failed to parse property value as int"
-            in fake_module.returned_data["msg"]
+    with pytest.raises(AnsibleFailJson) as exc:
+        run_module(
+            {
+                "state": "present",
+                "name": vmname,
+                "properties": {"memory": "toto"},
+            }
         )
-    else:
-        pytest.fail("Module should have raised an error")
+    assert "Failed to parse property value as int" in exc.value.args[0]["msg"]
 
 
 def test_properties_missing_netvm(qubes, vmname):
     # netvm does not exist
-    fake_module = Module(
-        {
-            "state": "present",
-            "name": vmname,
-            "properties": {"netvm": "toto"},
-        }
-    )
-    try:
-        QubeModule(fake_module).run()
-    except ModuleExitWithError:
-        assert (
-            "Cannot set value 'toto' to property 'netvm': the qube doesn't exist"
-            in fake_module.returned_data["msg"]
+    with pytest.raises(AnsibleFailJson) as exc:
+        run_module(
+            {
+                "state": "present",
+                "name": vmname,
+                "properties": {"netvm": "toto"},
+            }
         )
-
-        # Error should be raised before trying to create the qube
-        assert vmname not in qubes.domains
-    else:
-        pytest.fail("Module should have raised an error")
+    assert (
+        "Cannot set value 'toto' to property 'netvm': the qube doesn't exist"
+        in exc.value.args[0]["msg"]
+    )
+    # Error should be raised before trying to create the qube
+    assert vmname not in qubes.domains
 
 
 def test_properties_reset_to_default_netvm(qubes, vm, netvm):
@@ -422,42 +379,28 @@ def test_properties_reset_to_default_netvm(qubes, vm, netvm):
     default_netvm = vm.netvm
 
     # Change to non-default netvm
-    fake_module = Module(
+    result = run_module(
         {
             "state": "present",
             "name": vm.name,
             "properties": {"netvm": netvm.name},
         }
     )
-    QubeModule(fake_module).run()
 
-    assert (
-        fake_module.returned_data["diff"]["before"]["properties"]["netvm"]
-        == "*default*"
-    )
-    assert (
-        fake_module.returned_data["diff"]["after"]["properties"]["netvm"]
-        == netvm.name
-    )
+    assert result["diff"]["before"]["properties"]["netvm"] == "*default*"
+    assert result["diff"]["after"]["properties"]["netvm"] == netvm.name
 
     # Ability to reset back to default netvm, whichever it is
-    fake_module = Module(
+    result = run_module(
         {
             "state": "present",
             "name": vm.name,
             "properties": {"netvm": "*default*"},
         }
     )
-    QubeModule(fake_module).run()
 
-    assert (
-        fake_module.returned_data["diff"]["before"]["properties"]["netvm"]
-        == netvm.name
-    )
-    assert (
-        fake_module.returned_data["diff"]["after"]["properties"]["netvm"]
-        == "*default*"
-    )
+    assert result["diff"]["before"]["properties"]["netvm"] == netvm.name
+    assert result["diff"]["after"]["properties"]["netvm"] == "*default*"
     assert default_netvm != netvm
 
     qubes.domains.refresh_cache(force=True)
@@ -474,40 +417,28 @@ def test_properties_reset_to_default_mac(qubes, vm, request):
     mac = "11:22:33:44:55:66"
 
     # Change to non-default mac
-    fake_module = Module(
+    result = run_module(
         {
             "state": "present",
             "name": vm.name,
             "properties": {"mac": mac},
         }
     )
-    QubeModule(fake_module).run()
 
-    assert (
-        fake_module.returned_data["diff"]["before"]["properties"]["mac"]
-        == "*default*"
-    )
-    assert (
-        fake_module.returned_data["diff"]["after"]["properties"]["mac"] == mac
-    )
+    assert result["diff"]["before"]["properties"]["mac"] == "*default*"
+    assert result["diff"]["after"]["properties"]["mac"] == mac
 
     # Ability to reset back to default mac, whatever it is
-    fake_module = Module(
+    result = run_module(
         {
             "state": "present",
             "name": vm.name,
             "properties": {"mac": "*default*"},
         }
     )
-    QubeModule(fake_module).run()
 
-    assert (
-        fake_module.returned_data["diff"]["before"]["properties"]["mac"] == mac
-    )
-    assert (
-        fake_module.returned_data["diff"]["after"]["properties"]["mac"]
-        == "*default*"
-    )
+    assert result["diff"]["before"]["properties"]["mac"] == mac
+    assert result["diff"]["after"]["properties"]["mac"] == "*default*"
     assert default_mac != mac
 
     qubes.domains.refresh_cache(force=True)
@@ -516,74 +447,64 @@ def test_properties_reset_to_default_mac(qubes, vm, request):
 
 def test_properties_missing_default_dispvm(qubes):
     # default_dispvm does not exist
-    fake_module = Module(
-        {
-            "state": "present",
-            "name": "dom0",
-            "properties": {"default_dispvm": "toto"},
-        }
-    )
-    try:
-        QubeModule(fake_module).run()
-    except ModuleExitWithError:
-        assert (
-            "Cannot set value 'toto' to property 'default_dispvm': the qube doesn't exist"
-            in fake_module.returned_data["msg"]
+    with pytest.raises(AnsibleFailJson) as exc:
+        run_module(
+            {
+                "state": "present",
+                "name": "dom0",
+                "properties": {"default_dispvm": "toto"},
+            }
         )
-    else:
-        pytest.fail("Module should have raised an error")
+    assert (
+        "Cannot set value 'toto' to property 'default_dispvm': the qube doesn't exist"
+        in exc.value.args[0]["msg"]
+    )
 
 
 def test_properties_invalid_volume_name_for_appvm(qubes, vmname, request):
     # volume name not allowed for AppVM
-    fake_module = Module(
-        {
-            "state": "present",
-            "name": vmname,
-            "volumes": {"root": {"size": 10}},
-        }
-    )
-    try:
-        QubeModule(fake_module).run()
-    except ModuleExitWithError:
-        assert (
-            "Cannot change root volume config for 'AppVM"
-            in fake_module.returned_data["msg"]
+    with pytest.raises(AnsibleFailJson) as exc:
+        run_module(
+            {
+                "state": "present",
+                "name": vmname,
+                "volumes": {"root": {"size": 10}},
+            }
         )
-    else:
-        pytest.fail("Module should have raised an error")
+    assert (
+        "Cannot change root volume config for 'AppVM"
+        in exc.value.args[0]["msg"]
+    )
 
 
 def test_notes(qubes, vmname, request):
-    fake_module = Module(
-        {
-            "state": "present",
-            "name": vmname,
-            "notes": "For your eyes only",
-        }
-    )
-    QubeModule(fake_module).run()
+    params = {
+        "state": "present",
+        "name": vmname,
+        "notes": "For your eyes only",
+    }
+    result = run_module(params)
     assert qubes.domains[vmname].get_notes() == "For your eyes only"
-    assert (
-        fake_module.returned_data["diff"]["after"]["notes"]
-        == "For your eyes only"
-    )
+    assert result["diff"]["after"]["notes"] == "For your eyes only"
 
     # The 2nd call should not change the notes
-    QubeModule(fake_module).run()
-    assert not fake_module.returned_data["changed"]
+    result = run_module(params)
+    assert not result["changed"]
 
 
 def test_services_aliased_to_features_only(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
 
     services = ["clocksync", "minimal-netvm"]
-    fake_module = Module(
-        {"state": "present", "name": vmname, "services": services}
+    result = run_module(
+        {
+            "state": "present",
+            "name": vmname,
+            "services": services,
+        }
     )
-    QubeModule(fake_module).run()
 
-    assert fake_module.returned_data["changed"]
+    assert result["changed"]
 
     # And the VM should now have service.<svc> = 1 for each
     qube = qubes.domains[vmname]
@@ -600,14 +521,13 @@ def test_devices_strict_single_pci_assignment(
     port = latest_net_ports[-1]
 
     # Create VM in strict mode with only one PCI device
-    fake_module = Module(
+    run_module(
         {
             "state": "present",
             "name": vmname,
             "devices": [port],
         }
     )
-    QubeModule(fake_module).run()
 
     qubes.domains.refresh_cache(force=True)
     assigned = qubes.domains[vmname].devices["pci"].get_assigned_devices()
@@ -628,15 +548,13 @@ def test_devices_explicit_strict_assignment(
     request.node.mark_vm_created(vmname)
     port = latest_net_ports[-1]
 
-    # Create VM in strict mode with only one PCI device
-    fake_module = Module(
+    run_module(
         {
             "state": "present",
             "name": vmname,
             "devices": {"strategy": "strict", "items": [port]},
         }
     )
-    QubeModule(fake_module).run()
 
     qubes.domains.refresh_cache(force=True)
     assigned = qubes.domains[vmname].devices["pci"].get_assigned_devices()
@@ -658,14 +576,13 @@ def test_devices_strict_multiple_with_block(
     # Use both PCI net devices plus the block device
     devices = [latest_net_ports[-2], latest_net_ports[-1], block_device]
 
-    fake_module = Module(
+    run_module(
         {
             "state": "present",
             "name": vmname,
             "devices": devices,
         }
     )
-    QubeModule(fake_module).run()
 
     qubes.domains.refresh_cache(force=True)
     pci_assigned = qubes.domains[vmname].devices["pci"].get_assigned_devices()
@@ -695,17 +612,16 @@ def test_devices_append_strategy_adds_without_removal(
     second_port = latest_net_ports[-1]
 
     # Initial create with first PCI port
-    fake_module = Module(
+    run_module(
         {
             "state": "present",
             "name": vmname,
             "devices": [first_port],
         }
     )
-    QubeModule(fake_module).run()
 
     # Re-run with append strategy: add second PCI and block, keep first
-    fake_module = Module(
+    run_module(
         {
             "state": "present",
             "name": vmname,
@@ -715,7 +631,6 @@ def test_devices_append_strategy_adds_without_removal(
             },
         }
     )
-    QubeModule(fake_module).run()
 
     qubes.domains.refresh_cache(force=True)
     pci_ports = [
@@ -749,14 +664,13 @@ def test_devices_per_device_mode_and_options(
         "options": {"no-strict-reset": True},
     }
 
-    fake_module = Module(
+    run_module(
         {
             "state": "present",
             "name": vmname,
             "devices": [entry],
         }
     )
-    QubeModule(fake_module).run()
 
     qubes.domains.refresh_cache(force=True)
     assigned = list(qubes.domains[vmname].devices["pci"].get_assigned_devices())
@@ -775,22 +689,19 @@ def test_devices_strict_idempotent_sync(
     port = latest_net_ports[-1]
 
     # Initial assignment of a single PCI port
-    fake_module = Module(
-        {
-            "state": "present",
-            "name": vmname,
-            "devices": [port],
-        }
-    )
-    QubeModule(fake_module).run()
+    args = {
+        "state": "present",
+        "name": vmname,
+        "devices": [port],
+    }
 
-    assert fake_module.returned_data["changed"]
+    result = run_module(args)
+    assert result["changed"]
 
     # Re-run with the same device list (strict mode) — should be a no-op
-    QubeModule(fake_module).run()
-
+    result = run_module(args)
     # No changes on the second sync
-    assert not fake_module.returned_data["changed"]
+    assert not result["changed"]
 
     # Verify still exactly that one port is assigned
     qubes.domains.refresh_cache(force=True)
@@ -807,16 +718,14 @@ def test_devices_strict_unassign_all(qubes, vmname, request, latest_net_ports):
     ports = latest_net_ports[-2:]
 
     # Assign two PCI ports initially
-    fake_module = Module(
+    result = run_module(
         {
             "state": "present",
             "name": vmname,
             "devices": ports,
         }
     )
-    QubeModule(fake_module).run()
-
-    assert fake_module.returned_data["changed"]
+    assert result["changed"]
 
     qubes.domains.refresh_cache(force=True)
 
@@ -828,21 +737,18 @@ def test_devices_strict_unassign_all(qubes, vmname, request, latest_net_ports):
     assert initial == set(ports)
 
     # Now sync to an empty list (strict default) to remove all devices
-    fake_module = Module(
+    result = run_module(
         {
             "state": "present",
             "name": vmname,
             "devices": [],  # strict empty
         }
     )
-    QubeModule(fake_module).run()
 
     # Should report that it changed by removing devices
-    assert fake_module.returned_data["changed"]
-    assert (
-        len(fake_module.returned_data["diff"]["before"]["devices"]["pci"]) == 2
-    )
-    assert fake_module.returned_data["diff"]["after"]["devices"]["pci"] == {}
+    assert result["changed"]
+    assert len(result["diff"]["before"]["devices"]["pci"]) == 2
+    assert result["diff"]["after"]["devices"]["pci"] == {}
 
     # After removal, no PCI devices should remain assigned
     qubes.domains.refresh_cache(force=True)
@@ -851,17 +757,14 @@ def test_devices_strict_unassign_all(qubes, vmname, request, latest_net_ports):
     )
 
     # And a second empty-sync is a no-op
-    fake_module = Module(
+    result = run_module(
         {
             "state": "present",
             "name": vmname,
             "devices": [],
         }
     )
-
-    QubeModule(fake_module).run()
-
-    assert not fake_module.returned_data["changed"]
+    assert not result["changed"]
 
 
 def test_devices_unchanged(qubes, vmname, request, latest_net_ports):
@@ -869,28 +772,20 @@ def test_devices_unchanged(qubes, vmname, request, latest_net_ports):
     port = latest_net_ports[-1]
 
     # Initial assignment of a single PCI port
-    fake_module = Module(
-        {
-            "state": "present",
-            "name": vmname,
-            "devices": [port],
-        }
-    )
-    QubeModule(fake_module).run()
+    args = {
+        "state": "present",
+        "name": vmname,
+        "devices": [port],
+    }
 
-    assert fake_module.returned_data["changed"]
+    result = run_module(args)
+    assert result["changed"]
 
     # Re-run without devices, should not change anything
-    fake_module = Module(
-        {
-            "state": "present",
-            "name": vmname,
-            "devices": [port],
-        }
-    )
-    QubeModule(fake_module).run()
+    result = run_module(args)
+
     # No changes on the second sync
-    assert not fake_module.returned_data["changed"]
+    assert not result["changed"]
 
     # Verify still exactly that one port is assigned
     qubes.domains.refresh_cache(force=True)
@@ -909,7 +804,7 @@ def test_services_and_explicit_features_combined(qubes, vmname, request):
     features = {"foo": "bar"}
     services = ["audio", "net"]
 
-    fake_module = Module(
+    result = run_module(
         {
             "state": "present",
             "name": vmname,
@@ -917,10 +812,9 @@ def test_services_and_explicit_features_combined(qubes, vmname, request):
             "services": services,
         }
     )
-    QubeModule(fake_module).run()
 
     # The module should report 'features' was updated
-    assert fake_module.returned_data["diff"]["after"]["features"] == {
+    assert result["diff"]["after"]["features"] == {
         "foo": "bar",
         "service.audio": "1",
         "service.net": "1",
@@ -939,17 +833,15 @@ def test_services_and_explicit_features_combined(qubes, vmname, request):
 
 def test_properties_set_kernelopts(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
-    props = {"kernelopts": "swiotlb=4096 foo=bar"}
-    fake_module = Module(
+    result = run_module(
         {
             "state": "present",
             "name": vmname,
-            "properties": props,
+            "properties": {"kernelopts": "swiotlb=4096 foo=bar"},
         }
     )
-    QubeModule(fake_module).run()
     assert (
-        fake_module.returned_data["diff"]["after"]["properties"]["kernelopts"]
+        result["diff"]["after"]["properties"]["kernelopts"]
         == "swiotlb=4096 foo=bar"
     )
     assert qubes.domains[vmname].kernelopts == "swiotlb=4096 foo=bar"
@@ -957,16 +849,14 @@ def test_properties_set_kernelopts(qubes, vmname, request):
 
 def test_properties_set_timeouts(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
-    props = {"qrexec_timeout": 123, "shutdown_timeout": 456}
-    fake_module = Module(
+    result = run_module(
         {
             "state": "present",
             "name": vmname,
-            "properties": props,
+            "properties": {"qrexec_timeout": 123, "shutdown_timeout": 456},
         }
     )
-    QubeModule(fake_module).run()
-    assert fake_module.returned_data["diff"]["after"]["properties"] == {
+    assert result["diff"]["after"]["properties"] == {
         "qrexec_timeout": 123,
         "shutdown_timeout": 456,
     }
@@ -978,21 +868,19 @@ def test_properties_set_timeouts(qubes, vmname, request):
 
 def test_properties_set_ip_ip6_and_mac(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
-    props = {
-        "ip": "10.1.2.3",
-        "ip6": "fe80::1",
-        "mac": "00:11:22:33:44:55",
-    }
-    fake_module = Module(
+    result = run_module(
         {
             "state": "present",
             "name": vmname,
-            "properties": props,
+            "properties": {
+                "ip": "10.1.2.3",
+                "ip6": "fe80::1",
+                "mac": "00:11:22:33:44:55",
+            },
         }
     )
-    QubeModule(fake_module).run()
 
-    assert fake_module.returned_data["diff"]["after"]["properties"] == {
+    assert result["diff"]["after"]["properties"] == {
         "ip": "10.1.2.3",
         "ip6": "fe80::1",
         "mac": "00:11:22:33:44:55",
@@ -1008,17 +896,18 @@ def test_properties_set_management_dispvm_and_audiovm(
     qubes, vmname, managementdvm, audiovm, request
 ):
     request.node.mark_vm_created(vmname)
-    props = {"management_dispvm": managementdvm.name, "audiovm": audiovm.name}
-    fake_module = Module(
+    result = run_module(
         {
             "state": "present",
             "name": vmname,
-            "properties": props,
+            "properties": {
+                "management_dispvm": managementdvm.name,
+                "audiovm": audiovm.name,
+            },
         }
     )
-    QubeModule(fake_module).run()
 
-    assert fake_module.returned_data["diff"]["after"]["properties"] == {
+    assert result["diff"]["after"]["properties"] == {
         "management_dispvm": managementdvm.name,
         "audiovm": audiovm.name,
     }
@@ -1030,17 +919,15 @@ def test_properties_set_management_dispvm_and_audiovm(
 
 def test_properties_set_default_user_and_guivm(qubes, vmname, guivm, request):
     request.node.mark_vm_created(vmname)
-    props = {"default_user": "alice", "guivm": guivm.name}
-    fake_module = Module(
+    result = run_module(
         {
             "state": "present",
             "name": vmname,
-            "properties": props,
+            "properties": {"default_user": "alice", "guivm": guivm.name},
         }
     )
-    QubeModule(fake_module).run()
 
-    assert fake_module.returned_data["diff"]["after"]["properties"] == {
+    assert result["diff"]["after"]["properties"] == {
         "default_user": "alice",
         "guivm": guivm.name,
     }
@@ -1054,35 +941,26 @@ def test_properties_set_default_user_and_guivm(qubes, vmname, guivm, request):
 def test_properties_invalid_type_for_new_properties(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
     # ip must be str, not int
-    fake_module = Module(
-        {
-            "state": "present",
-            "name": vmname,
-            "properties": {"ip": 12345},
-        }
-    )
-
-    try:
-        QubeModule(fake_module).run()
-    except ModuleExitWithError:
-        assert "Invalid property value type" in fake_module.returned_data["msg"]
-    else:
-        pytest.fail("Module should have raised an error")
+    with pytest.raises(AnsibleFailJson) as exc:
+        run_module(
+            {
+                "state": "present",
+                "name": vmname,
+                "properties": {"ip": 12345},
+            }
+        )
+    assert "Invalid property value type" in exc.value.args[0]["msg"]
 
     # qrexec_timeout must be int, not str
-    fake_module = Module(
-        {
-            "state": "present",
-            "name": vmname,
-            "properties": {"qrexec_timeout": "sixty"},
-        }
-    )
-    try:
-        QubeModule(fake_module).run()
-    except ModuleExitWithError:
-        assert "Invalid property value type" in fake_module.returned_data["msg"]
-    else:
-        pytest.fail("Module should have raised an error")
+    with pytest.raises(AnsibleFailJson) as exc:
+        run_module(
+            {
+                "state": "present",
+                "name": vmname,
+                "properties": {"qrexec_timeout": "sixty"},
+            }
+        )
+    assert "Invalid property value type" in exc.value.args[0]["msg"]
 
 
 def test_change_properties_should_occur_only_when_necessary(
@@ -1112,96 +990,95 @@ def test_change_properties_should_occur_only_when_necessary(
         "vcpus": 3,
     }
 
-    fake_module = Module(
+    result = run_module(
         {
             "state": "present",
             "name": vmname,
         }
     )
-    QubeModule(fake_module).run()
-    assert fake_module.returned_data["created"]
+    assert result["created"]
 
-    fake_module = Module(
-        {
-            "state": "present",
-            "name": vmname,
-            "properties": properties,
-        }
-    )
-    QubeModule(fake_module).run()
-
-    assert fake_module.returned_data["changed"]
-    assert fake_module.returned_data["diff"]["before"]["properties"]
-    assert fake_module.returned_data["diff"]["after"]["properties"]
-
-    fake_module = Module(
+    result = run_module(
         {
             "state": "present",
             "name": vmname,
             "properties": properties,
         }
     )
-    QubeModule(fake_module).run()
 
-    assert not fake_module.returned_data["diff"]["before"]
-    assert not fake_module.returned_data["diff"]["after"]
+    assert result["changed"]
+    assert result["diff"]["before"]["properties"]
+    assert result["diff"]["after"]["properties"]
 
-    fake_module = Module(
+    result = run_module(
+        {
+            "state": "present",
+            "name": vmname,
+            "properties": properties,
+        }
+    )
+
+    assert not result["diff"]["before"]
+    assert not result["diff"]["after"]
+
+    run_module(
         {
             "state": "absent",
             "name": vmname,
         }
     )
-    QubeModule(fake_module).run()
 
 
 def test_set_property_to_empty_string(vm, qubes):
-    fake_module = Module(
+    run_module(
         {
             "state": "present",
             "name": vm.name,
             "properties": {"netvm": "sys-net"},
         }
     )
-    QubeModule(fake_module).run()
     assert qubes.domains[vm.name].netvm == "sys-net"
 
-    fake_module = Module(
-        {"state": "present", "name": vm.name, "properties": {"netvm": ""}}
+    run_module(
+        {
+            "state": "present",
+            "name": vm.name,
+            "properties": {"netvm": ""},
+        }
     )
-    QubeModule(fake_module).run()
     assert qubes.domains[vm.name].netvm == None
 
 
 def test_set_property_to_none(vm, qubes):
-    fake_module = Module(
+    run_module(
         {
             "state": "present",
             "name": vm.name,
             "properties": {"netvm": "sys-net"},
         }
     )
-    QubeModule(fake_module).run()
     assert qubes.domains[vm.name].netvm == "sys-net"
 
-    fake_module = Module(
-        {"state": "present", "name": vm.name, "properties": {"netvm": None}}
+    run_module(
+        {
+            "state": "present",
+            "name": vm.name,
+            "properties": {"netvm": None},
+        }
     )
-    QubeModule(fake_module).run()
     assert qubes.domains[vm.name].netvm == None
 
 
 def test_create_vm_which_is_its_self_dispvm(vmname, request, qubes):
     request.node.mark_vm_created(vmname)
 
-    fake_module = Module(
+    run_module(
         {
             "state": "present",
             "name": vmname,
             "properties": {"default_dispvm": vmname},
         }
     )
-    QubeModule(fake_module).run()
     assert qubes.domains[vmname].default_dispvm == vmname
 
 
@@ -1209,46 +1086,62 @@ def test_setting_qube_value_to_the_same_value_than_default(vm):
     assert vm.property_is_default("autostart")
     assert vm.autostart == False
 
-    fake_module = Module(
+    result = run_module(
         {
             "state": "present",
             "name": vm.name,
             "properties": {"autostart": False},
         }
     )
-    QubeModule(fake_module).run()
-    assert fake_module.returned_data["changed"]
-    assert (
-        fake_module.returned_data["diff"]["before"]["properties"]["autostart"]
-        == "*default*"
-    )
-    assert (
-        fake_module.returned_data["diff"]["after"]["properties"]["autostart"]
-        == False
-    )
+    assert result["changed"]
+    assert result["diff"]["before"]["properties"]["autostart"] == "*default*"
+    assert result["diff"]["after"]["properties"]["autostart"] == False
     assert vm.autostart == False
     assert not vm.property_is_default("autostart")
 
     # Idempotence
-    QubeModule(fake_module).run()
-    assert not fake_module.returned_data["changed"]
+    result = run_module(
+        {
+            "state": "present",
+            "name": vm.name,
+            "properties": {"autostart": False},
+        }
+    )
+    assert not result["changed"]
 
-    fake_module = Module(
+    result = run_module(
         {
             "state": "present",
             "name": vm.name,
             "properties": {"autostart": "*default*"},
         }
     )
-    QubeModule(fake_module).run()
-    assert fake_module.returned_data["changed"]
-    assert (
-        fake_module.returned_data["diff"]["before"]["properties"]["autostart"]
-        == False
-    )
-    assert (
-        fake_module.returned_data["diff"]["after"]["properties"]["autostart"]
-        == "*default*"
-    )
+    assert result["changed"]
+    assert result["diff"]["before"]["properties"]["autostart"] == False
+    assert result["diff"]["after"]["properties"]["autostart"] == "*default*"
     assert vm.autostart == False
     assert vm.property_is_default("autostart")
+
+
+def test_no_vm_klass_should_no_try_to_convert_to_appvm(request, vmname, qubes):
+    request.node.mark_vm_created(vmname)
+    run_module(
+        {
+            "state": "present",
+            "name": vmname,
+            "klass": "StandaloneVM",
+            "clone_src": qubes.default_template.name,
+        }
+    )
+    assert qubes.domains[vmname].klass == "StandaloneVM"
+
+    # Start qube without specifying its klass — must NOT try to convert to AppVM
+    run_module(
+        {
+            "state": "running",
+            "name": vmname,
+        }
+    )
+
+    assert qubes.domains[vmname].get_power_state() == "Running"
+    assert qubes.domains[vmname].klass == "StandaloneVM"
