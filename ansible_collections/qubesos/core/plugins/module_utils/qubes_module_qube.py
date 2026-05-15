@@ -109,9 +109,6 @@ class QubeModule:
             klass=module.params.get("klass"),
         )
 
-        if self.wants.properties is None:
-            self.wants.properties = {}
-
         # Sync template var with template key in properties var
         # No template property for TemplateVMs and StandaloneVMs
         if self.wants.klass not in ("TemplateVM", "StandaloneVM"):
@@ -519,7 +516,7 @@ class QubeModule:
             if property in ["default_dispvm", "management_dispvm"]:
                 if not vm.klass == "AppVM" or not vm.template_for_dispvms:
                     self.module.fail_json(
-                        msg=f"Cannot set value '{value}' to property '{property}: the qube is not a template for dispvm",
+                        msg=f"Cannot set value '{value}' to property '{property}': the qube is not a template for dispvm",
                     )
 
     def validate_services(self):
@@ -533,7 +530,7 @@ class QubeModule:
             self.wants.features[f"service.{service}"] = "1"
 
     def validate_volumes(self):
-        """Validates 'volumes' module parameters (variable f"""
+        """Validates 'volumes' module parameter"""
         try:
             for volume_name, volume_config in self.wants.volumes.items():
                 if volume_name not in ["private", "root"]:
@@ -631,7 +628,7 @@ def main():
             shutdown_if_required=dict(type="bool", default=False),
             tags=dict(type="list", default=[]),
             template=dict(type="str", default=None),
-            klass=dict(type="str", default="AppVM", aliases=["vmtype"]),
+            klass=dict(type="str", default=None, aliases=["vmtype"]),
             volumes=dict(type="dict", default=None),
         ),
     )

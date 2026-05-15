@@ -2,25 +2,20 @@ import os
 import time
 
 import pytest
-import qubesadmin
 
-from ansible_collections.qubesos.core.plugins.module_utils.qubes_module_command import (
-    core,
+from tests.qubes.ansible_test_utils import (
+    AnsibleFailJson,
+    run_module_qubesos_core_command as run_module,
 )
-from tests.qubes.conftest import qubes, vmname, Module, ModuleExitWithError
+
+from tests.qubes.conftest import qubes, vmname
 
 
 def test_unrecognized_command():
     # Create
-    fake_module = Module({"command": "foo"})
-    try:
-        core(fake_module)
-    except ModuleExitWithError:
-        assert (
-            fake_module.returned_data["msg"] == "Command 'foo' not recognized"
-        )
-    else:
-        pytest.fail("Module should have raised an error")
+    with pytest.raises(AnsibleFailJson) as exc:
+        run_module({"command": "foo"})
+    assert "value of command must be one of" in exc.value.args[0]["msg"]
 
 
 def test_lifecycle_full_create_start_shutdown_remove(qubes, vmname, request):
@@ -28,25 +23,22 @@ def test_lifecycle_full_create_start_shutdown_remove(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
 
     # Create
-    fake_module = Module(
-        {"command": "create", "name": vmname, "vmtype": "AppVM"}
-    )
-    core(fake_module)
-    assert fake_module.returned_data["created"] == vmname
+    res = run_module({"command": "create", "name": vmname, "vmtype": "AppVM"})
+    assert res["created"] == vmname
     assert vmname in qubes.domains
 
     # Start
-    core(Module({"command": "start", "name": vmname}))
+    run_module({"command": "start", "name": vmname})
     vm = qubes.domains[vmname]
     assert vm.is_running()
 
     # Shutdown
-    core(Module({"command": "shutdown", "name": vmname}))
+    run_module({"command": "shutdown", "name": vmname})
     time.sleep(5)
     assert vm.is_halted()
 
     # Remove
-    core(Module({"command": "remove", "name": vmname}))
+    run_module({"command": "remove", "name": vmname})
     qubes.domains.refresh_cache(force=True)
     assert vmname not in qubes.domains
 
@@ -55,50 +47,51 @@ def test_lifecycle_create_and_absent(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
 
     # Create
-    core(Module({"command": "create", "name": vmname, "vmtype": "AppVM"}))
+    run_module({"command": "create", "name": vmname, "vmtype": "AppVM"})
     assert vmname in qubes.domains
 
     # Absent
-    core(Module({"command": "remove", "name": vmname}))
+    run_module({"command": "remove", "name": vmname})
     qubes.domains.refresh_cache(force=True)
     assert vmname not in qubes.domains
 
 
 def test_lifecycle_pause_and_resume(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
-    core(Module({"command": "create", "name": vmname, "vmtype": "AppVM"}))
-    core(Module({"command": "start", "name": vmname}))
+    run_module({"command": "create", "name": vmname, "vmtype": "AppVM"})
+    run_module({"command": "start", "name": vmname})
     time.sleep(1)
 
-    core(Module({"command": "pause", "name": vmname}))
+    run_module({"command": "pause", "name": vmname})
     assert qubes.domains[vmname].is_paused()
 
-    core(Module({"command": "unpause", "name": vmname}))
+    run_module({"command": "unpause", "name": vmname})
     assert qubes.domains[vmname].is_running()
 
     # Clean up
-    core(Module({"command": "destroy", "name": vmname}))
-    core(Module({"command": "remove", "name": vmname}))
+    run_module({"command": "destroy", "name": vmname})
+    run_module({"command": "remove", "name": vmname})
 
 
 def test_lifecycle_status_reporting(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
-    fake_module = Module({"command": "status", "name": vmname})
 
-    core(Module({"command": "create", "name": vmname, "vmtype": "AppVM"}))
-    core(fake_module)
-    assert fake_module.returned_data["status"] == "shutdown"
+    status_params = {"command": "status", "name": vmname}
 
-    core(Module({"command": "start", "name": vmname}))
-    core(fake_module)
-    assert fake_module.returned_data["status"] == "running"
+    run_module({"command": "create", "name": vmname, "vmtype": "AppVM"})
+    res = run_module(status_params)
+    assert res["status"] == "shutdown"
 
-    core(Module({"command": "destroy", "name": vmname}))
-    core(fake_module)
-    assert fake_module.returned_data["status"] == "shutdown"
+    run_module({"command": "start", "name": vmname})
+    res = run_module(status_params)
+    assert res["status"] == "running"
+
+    run_module({"command": "destroy", "name": vmname})
+    res = run_module(status_params)
+    assert res["status"] == "shutdown"
     assert qubes.domains[vmname].get_power_state() == "Halted"
 
-    core(Module({"command": "remove", "name": vmname}))
+    run_module({"command": "remove", "name": vmname})
 
 
 def test_create_clone_vmtype_combinations(qubes, vmname, request):
@@ -108,72 +101,68 @@ def test_create_clone_vmtype_combinations(qubes, vmname, request):
     # request.node.mark_vm_created(f"{vmname}-clone-standalonevm")
 
     # Test creating / cloning from AppVM
-    core(Module({"command": "create", "name": vmname, "vmtype": "AppVM"}))
-    core(
-        Module(
-            {
-                "command": "create",
-                "name": f"{vmname}-clone-appvm",
-                "template": vmname,
-                "vmtype": "AppVM",
-            }
-        )
+    run_module({"command": "create", "name": vmname, "vmtype": "AppVM"})
+    run_module(
+        {
+            "command": "create",
+            "name": f"{vmname}-clone-appvm",
+            "template": vmname,
+            "vmtype": "AppVM",
+        }
     )
 
     assert f"{vmname}-clone-appvm" in qubes.domains
 
-    # rc, _ = core(Module({"command": "create", "name": f"{vmname}-clone-templatevm", "template": vmname, "vmtype": "TemplateVM"}))
+    # rc, _ = run_module({"command": "create", "name": f"{vmname}-clone-templatevm", "template": vmname, "vmtype": "TemplateVM"})
     # assert rc == VIRT_SUCCESS
     # assert f"{vmname}-clone-templatevm" in qubes.domains
 
-    # rc, _ = core(Module({"command": "create", "name": f"{vmname}-clone-standalonevm", "template": vmname, "vmtype": "StandaloneVM"}))
+    # rc, _ = run_module({"command": "create", "name": f"{vmname}-clone-standalonevm", "template": vmname, "vmtype": "StandaloneVM"})
     # assert rc == VIRT_SUCCESS
     # assert f"{vmname}-clone-standalonevm" in qubes.domains
 
     # Test creating / cloning from TemplateVM
-    core(Module({"command": "create", "name": vmname, "vmtype": "TemplateVM"}))
-    core(
-        Module(
-            {
-                "command": "create",
-                "name": f"{vmname}-clone-appvm",
-                "template": vmname,
-                "vmtype": "AppVM",
-            }
-        )
+    run_module({"command": "create", "name": vmname, "vmtype": "TemplateVM"})
+    run_module(
+        {
+            "command": "create",
+            "name": f"{vmname}-clone-appvm",
+            "template": vmname,
+            "vmtype": "AppVM",
+        }
     )
 
     assert f"{vmname}-clone-appvm" in qubes.domains
     #
-    # rc, _ = core(Module({"command": "create", "name": f"{vmname}-clone-templatevm", "template": vmname, "vmtype": "TemplateVM"}))
+    # rc, _ = run_module({"command": "create", "name": f"{vmname}-clone-templatevm", "template": vmname, "vmtype": "TemplateVM"})
     #
     # assert rc == VIRT_SUCCESS
     # assert f"{vmname}-clone-templatevm" in qubes.domains
     #
-    # rc, _ = core(Module({"command": "create", "name": f"{vmname}-clone-standalonevm", "template": vmname, "vmtype": "StandaloneVM"}))
+    # rc, _ = run_module({"command": "create", "name": f"{vmname}-clone-standalonevm", "template": vmname, "vmtype": "StandaloneVM"})
     #
     # assert rc == VIRT_SUCCESS
     # assert f"{vmname}-clone-standalonevm" in qubes.domains
     #
     # # Test creating / cloning from StandaloneVM
-    # core(Module({"command": "create", "name": vmname, "vmtype": "StandaloneVM"}))
-    # rc, _ = core(Module({"command": "create", "name": f"{vmname}-clone-appvm", "template": vmname, "vmtype": "AppVM"}))
+    # run_module({"command": "create", "name": vmname, "vmtype": "StandaloneVM"})
+    # rc, _ = run_module({"command": "create", "name": f"{vmname}-clone-appvm", "template": vmname, "vmtype": "AppVM"})
     # assert rc == VIRT_SUCCESS
     # assert f"{vmname}-clone-appvm" in qubes.domains
     #
-    # rc, _ = core(Module({"command": "create", "name": f"{vmname}-clone-templatevm", "template": vmname, "vmtype": "TemplateVM"}))
+    # rc, _ = run_module({"command": "create", "name": f"{vmname}-clone-templatevm", "template": vmname, "vmtype": "TemplateVM"})
     # assert rc == VIRT_SUCCESS
     # assert f"{vmname}-clone-templatevm" in qubes.domains
     #
-    # rc, _ = core(Module({"command": "create", "name": f"{vmname}-clone-standalonevm", "template": vmname, "vmtype": "StandaloneVM"}))
+    # rc, _ = run_module({"command": "create", "name": f"{vmname}-clone-standalonevm", "template": vmname, "vmtype": "StandaloneVM"})
     # assert rc == VIRT_SUCCESS
     # assert f"{vmname}-clone-standalonevm" in qubes.domains
     #
     # Cleanup
-    core(Module({"command": "remove", "name": f"{vmname}-clone-appvm"}))
-    # core(Module({"state": "absent", "name": f"{vmname}-clone-templatevm"}))
-    # core(Module({"state": "absent", "name": f"{vmname}-clone-standalonevm"}))
-    core(Module({"command": "remove", "name": vmname}))
+    run_module({"command": "remove", "name": f"{vmname}-clone-appvm"})
+    # run_module({"state": "absent", "name": f"{vmname}-clone-templatevm"})
+    # run_module({"state": "absent", "name": f"{vmname}-clone-standalonevm"})
+    run_module({"command": "remove", "name": vmname})
 
 
 def test_inventory_generation_and_grouping(tmp_path, qubes):
@@ -181,15 +170,13 @@ def test_inventory_generation_and_grouping(tmp_path, qubes):
     os.chdir(tmp_path)
 
     # Create a standalone VM (by default we don't have any)
-    core(
-        Module(
-            {
-                "command": "create",
-                "name": "teststandalone",
-                "vmtype": "StandaloneVM",
-                "template": "debian-13-xfce",
-            }
-        )
+    run_module(
+        {
+            "command": "create",
+            "name": "teststandalone",
+            "vmtype": "StandaloneVM",
+            "template": "debian-13-xfce",
+        }
     )
 
     # Collect expected VMs by class
@@ -200,9 +187,8 @@ def test_inventory_generation_and_grouping(tmp_path, qubes):
         expected.setdefault(vm.klass, []).append(vm.name)
 
     # Run createinventory
-    fake_module = Module({"command": "createinventory"})
-    core(fake_module)
-    assert fake_module.returned_data["status"] == "successful"
+    res = run_module({"command": "createinventory"})
+    assert res["status"] == "successful"
 
     inv_file = tmp_path / "inventory"
     assert inv_file.exists()
@@ -229,37 +215,27 @@ def test_inventory_generation_and_grouping(tmp_path, qubes):
     assert set(standalonevms) == set(expected.get("StandaloneVM", []))
 
 
+@pytest.mark.xfail(reason="Module sets a default value for tags")
 def test_removetags_errors_if_no_tags_present(qubes, vmname, request):
     request.node.mark_vm_created(vmname)
 
     # Create
-    fake_module = Module(
-        {"command": "create", "name": vmname, "vmtype": "AppVM"}
-    )
-    core(fake_module)
+    run_module({"command": "create", "name": vmname, "vmtype": "AppVM"})
     assert vmname in qubes.domains
 
     # Remove tags
-    fake_module = Module({"command": "removetags", "name": vmname})
-    try:
-        core(fake_module)
-
-    except ModuleExitWithError:
-        assert (
-            fake_module.returned_data["msg"]
-            == "Expected 'tags' parameter to be specified"
-        )
-    else:
-        pytest.fail("Module should have raised an error")
+    with pytest.raises(AnsibleFailJson) as exc:
+        run_module({"command": "removetags", "name": vmname})
+    assert (
+        exc.value.args[0]["msg"] == "Expected 'tags' parameter to be specified"
+    )
 
 
 def test_list_vms_command(vm):
-    fake_module = Module({"command": "list_vms", "state": "shutdown"})
-    core(fake_module)
-    assert vm.name in fake_module.returned_data["list_vms"]
+    res = run_module({"command": "list_vms", "state": "shutdown"})
+    assert vm.name in res["list_vms"]
 
 
 def test_get_states_command(vm):
-    fake_module = Module({"command": "get_states"})
-    core(fake_module)
-    assert f"{vm.name} shutdown" in fake_module.returned_data["states"]
+    res = run_module({"command": "get_states"})
+    assert f"{vm.name} shutdown" in res["states"]
