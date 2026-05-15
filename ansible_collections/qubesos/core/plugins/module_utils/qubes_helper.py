@@ -129,14 +129,19 @@ class QubesHelper(object):
             }
         return info
 
-    def shutdown(self, vmname, wait=False):
+    def shutdown(self, vmname, wait=False, force=False):
         """
         Shutdown the specified qube via the given id or name,
         optionally waiting until it halts.
+
+        If ``force`` is True, passes ``force=True`` to
+        ``qubesadmin.vm.QubesVM.shutdown`` so the shutdown proceeds
+        regardless of connected domains (equivalent to
+        ``qvm-shutdown --force``).
         """
         vm = self.get_vm(vmname)
         with suppress(QubesVMNotStartedError):
-            vm.shutdown()
+            vm.shutdown(force=force)
 
         if wait:
             try:
@@ -154,13 +159,13 @@ class QubesHelper(object):
                 )
         return 0
 
-    def restart(self, vmname, wait=False):
+    def restart(self, vmname, wait=False, force=False):
         """
         Restart the specified qube via the given id or name
         by shutting it down (with optional wait) and then starting it.
         """
         try:
-            self.shutdown(vmname, wait=wait)
+            self.shutdown(vmname, wait=wait, force=force)
         except RuntimeError:
             raise
         vm = self.get_vm(vmname)

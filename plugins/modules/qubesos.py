@@ -60,6 +60,19 @@ options:
       - Only applies to C(shutdown) and C(restarted) states.
     type: bool
     default: false
+  force:
+    description:
+      - If C(true), shut down the target VM regardless of whether other
+        VMs are connected to it (e.g. AppVMs using it as a netvm).
+      - Equivalent to C(qvm-shutdown --force) on the CLI. The target still
+        halts gracefully; only the "connected domains" precondition is
+        skipped. Dependent VMs keep running but lose their uplink until
+        the netvm is started again.
+      - For a hard-kill (equivalent to C(qvm-kill) / SIGKILL of the Xen
+        domain, no graceful shutdown), use C(state=destroyed) instead.
+      - Only applies to C(shutdown) and C(restarted) states.
+    type: bool
+    default: false
   command:
     description:
       - Non-idempotent command to execute on the VM.
@@ -438,6 +451,7 @@ def core(module):
     tags = module.params.get("tags", [])
     devices = module.params.get("devices", None)
     notes = module.params.get("notes", None)
+    force = module.params.get("force", False)
 
     v = QubesHelper(module)
 
@@ -533,6 +547,7 @@ def core(module):
                     "clone_src": clone_src,
                     "devices": devices,
                     "features": features,
+                    "force": force,
                     "klass": vmtype,
                     "name": guest,
                     "notes": notes,
@@ -634,6 +649,7 @@ def core(module):
                 {
                     "name": guest,
                     "state": state,
+                    "force": force,
                 }
             )
             return VIRT_SUCCESS, fake_module.returned_data
@@ -662,6 +678,7 @@ def main():
                 ],
             ),
             wait=dict(type="bool", default=True),
+            force=dict(type="bool", default=False),
             command=dict(type="str", choices=ALL_COMMANDS),
             label=dict(type="str", default=None),
             vmtype=dict(type="str", default=None),

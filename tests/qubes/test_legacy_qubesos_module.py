@@ -1316,3 +1316,50 @@ def test_no_vm_klass_should_no_try_to_convert_to_appvm(request, vmname, qubes):
     assert rc == VIRT_SUCCESS
     assert qubes.domains[vmname].get_power_state() == "Running"
     assert qubes.domains[vmname].klass == "StandaloneVM"
+
+
+def test_lifecycle_shutdown_force_with_dependent(qubes, vm, netvm):
+    """force=True shuts down a netvm that still has a running dependent.
+
+    Without force, the underlying vm.shutdown() raises QubesVMInUseError,
+    which the module surfaces as a task failure. Mirrors the CLI's
+    qvm-shutdown --force semantics: the target halts gracefully; only
+    the "connected domains" precondition is skipped. Dependents keep
+    running (without uplink).
+
+    Refs: QubesOS/qubes-issues#10856
+    """
+    # Start the netvm
+    rc, _ = run_module({"command": "start", "name": netvm.name})
+    assert rc == VIRT_SUCCESS
+    assert netvm.is_running()
+
+    # Point the dependent AppVM at this netvm and start it
+    rc, _ = run_module(
+        {
+            "state": "present",
+            "name": vm.name,
+            "properties": {"netvm": netvm.name},
+        }
+    )
+
+    assert rc == VIRT_SUCCESS
+    rc, _ = run_module({"command": "start", "name": vm.name})
+    assert rc == VIRT_SUCCESS
+    qubes.domains.refresh_cache(force=True)
+    assert qubes.domains[vm.name].is_running()
+
+    # Force-shutdown the netvm despite the running dependent
+    rc, _ = run_module(
+        {
+            "state": "shutdown",
+            "name": netvm.name,
+            "wait": True,
+            "force": True,
+        }
+    )
+
+    assert rc == VIRT_SUCCESS
+    assert netvm.is_halted()
+    # Dependent is still running; it has merely lost its uplink.
+    assert qubes.domains[vm.name].is_running()
