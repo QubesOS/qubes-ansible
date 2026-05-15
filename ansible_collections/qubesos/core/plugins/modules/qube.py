@@ -95,6 +95,20 @@ options:
             - You have to provide a dict with features name as dict key and the desired value as dict value.
         type: dict
 
+    force:
+        description:
+            - If C(true), shut down the target VM regardless of whether other
+              VMs are connected to it (e.g. AppVMs using it as a netvm).
+            - Equivalent to C(qvm-shutdown --force) on the CLI. The target still
+              halts gracefully; only the "connected domains" precondition is
+              skipped. Dependent VMs keep running but lose their uplink until
+              the netvm is started again.
+            - For a hard-kill (equivalent to C(qvm-kill) / SIGKILL of the Xen
+              domain, no graceful shutdown), use C(state=destroyed) instead.
+            - Only applies to C(shutdown) and C(restarted) states.
+        type: bool
+        default: false
+
     notes:
         description:    
             - Set the qube notes.

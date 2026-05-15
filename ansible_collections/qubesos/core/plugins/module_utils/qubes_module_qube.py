@@ -77,6 +77,7 @@ class QubeModule:
         self.created = False
         self.deleted = False
         self.diff = {"before": {}, "after": {}}
+        self.force_shutdown = module.params.get("force")
         self.helper = QubesHelper(module)
         self.qube: QubesVM = self.helper.app.domains.get(self.qube_name)
         self.shutdown_if_required = module.params.get("shutdown_if_required")
@@ -131,7 +132,9 @@ class QubeModule:
                 # `shutdown_if_required` module params allows us stop it
                 # if necessary
                 if self.shutdown_if_required:
-                    self.helper.shutdown(self.qube_name, wait=True)
+                    self.helper.shutdown(
+                        self.qube_name, wait=True, force=self.force_shutdown
+                    )
                 else:
                     self.module.fail_json(
                         msg="Cannot change the template while the qube is running"
@@ -577,7 +580,9 @@ class QubeModule:
             if self.wants.state in ["halted", "restarted"]:
                 if not self.qube.is_halted():
                     self.changed = True
-                    self.helper.shutdown(self.qube_name, wait=True)
+                    self.helper.shutdown(
+                        self.qube_name, wait=True, force=self.force_shutdown
+                    )
 
             self.enforce_all()
 
@@ -622,6 +627,7 @@ def main():
             clone_src=dict(type="str", default=None),
             devices=dict(type="raw", default=None),
             features=dict(type="dict", default=None),
+            force=dict(type="bool", default=False),
             notes=dict(type="str", default=None),
             properties=dict(type="dict", default=None),
             services=dict(type="list", default=None),
