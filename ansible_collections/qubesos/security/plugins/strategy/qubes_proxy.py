@@ -640,7 +640,18 @@ class StrategyModule(LinearStrategyModule):
                 # Mark host as failed
                 self._tqm._failed_hosts[host.name] = True
 
-        return max(self.qubes_results.values())
+
+        # When all hosts failed, we should stop playbook execution
+        if all(rc != 0 for rc in self.qubes_results.values()):
+            return self._tqm.RUN_FAILED_BREAK_PLAY
+
+        # When at least one failure occurred but not for all hosts, mark this
+        # play as failed but continue playbook execution
+        if any(rc != 0 for rc in self.qubes_results.values()):
+            return self._tqm.RUN_FAILED_HOSTS
+
+        # When no error, it's OK!
+        return self._tqm.RUN_OK
 
     def run(self, iterator, play_context):
         play = iterator._play
