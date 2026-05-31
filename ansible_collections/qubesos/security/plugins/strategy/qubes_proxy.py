@@ -637,15 +637,22 @@ class StrategyModule(LinearStrategyModule):
                 stats.increment("ok", host.name)
             else:
                 stats.increment("failures", host.name)
+                # Mark host as failed
+                self._tqm._failed_hosts[host.name] = True
 
         return max(self.qubes_results.values())
 
     def run(self, iterator, play_context):
         play = iterator._play
 
+        # Get previously failed hosts and ignore them.
+        previously_failed = set(iterator.get_failed_hosts().keys())
         target_hosts = self._inventory.get_hosts(play.hosts)
         local_hosts = [
-            host for host in target_hosts if host.name in ["localhost", "dom0"]
+            host
+            for host in target_hosts
+            if host.name in ["localhost", "dom0"]
+            and host.name not in previously_failed
         ]
         retval_local_exec = self._tqm.RUN_OK
 
@@ -653,6 +660,7 @@ class StrategyModule(LinearStrategyModule):
             host
             for host in target_hosts
             if host.name not in ["localhost", "dom0"]
+            and host.name not in previously_failed
         ]
         retval_remote_exec = self._tqm.RUN_OK
 
