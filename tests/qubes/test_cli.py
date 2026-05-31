@@ -414,3 +414,236 @@ def test_devices_assignment(
         for d in assigned
     ]
     assert ports_assigned == [port]
+
+
+@pytest.mark.parametrize(
+    "ansible_config",
+    ["ansible_proxy_strategy", "ansible_linear_strategy"],
+)
+def test_playbook_execution_stops_for_the_host_only_when_single_host_fails(
+    vmname, run_playbook, request, qubes, ansible_config
+):
+    vm_1 = f"{vmname}_1"
+    vm_2 = f"{vmname}_2"
+
+    request.node.mark_vm_created(vm_1)
+    request.node.mark_vm_created(vm_2)
+
+    playbook = [
+        {
+            "hosts": "localhost",
+            "gather_facts": False,
+            "connection": "ansible.builtin.local",
+            "tasks": [
+                {
+                    "name": f"Create qube {vm_2}",
+                    "qubesos.core.qube": {"name": vm_1, "state": "present"},
+                },
+                {
+                    "name": f"Create qube {vm_2}",
+                    "qubesos.core.qube": {"name": vm_2, "state": "present"},
+                },
+            ],
+        },
+    ]
+
+    playbook_res = run_playbook(playbook)
+    assert playbook_res.returncode == 0, playbook_res.stdout
+    assert vm_1 in qubes.domains
+    assert vm_2 in qubes.domains
+
+    playbook = [
+        # 1st play, adding hosts to appvms group
+        {
+            "hosts": "localhost",
+            "gather_facts": False,
+            "connection": "ansible.builtin.local",
+            "tasks": [
+                {
+                    "ansible.builtin.add_host": {
+                        "name": vm_1,
+                        "groups": "appvms",
+                    },
+                },
+                {
+                    "ansible.builtin.add_host": {
+                        "name": vm_2,
+                        "groups": "appvms",
+                    },
+                },
+            ],
+        },
+        # 2nd play, make vm_2 fail
+        {
+            "hosts": "appvms",
+            "gather_facts": False,
+            "connection": "qubes",
+            "vars": {
+                "cmd": {
+                    f"{vm_1}": "/bin/true",
+                    f"{vm_2}": "/bin/false",
+                }
+            },
+            "tasks": [
+                {
+                    "ansible.builtin.command": "{{ cmd[inventory_hostname] }}",
+                },
+            ],
+        },
+        # 3rd play, only vm_1 should run it
+        {
+            "hosts": "appvms",
+            "gather_facts": False,
+            "connection": "qubes",
+            "tasks": [
+                {
+                    "ansible.builtin.command": "/bin/true",
+                },
+            ],
+        },
+        # 4th play, localhost should run it
+        {
+            "hosts": "localhost",
+            "gather_facts": False,
+            "connection": "ansible.builtin.local",
+            "tasks": [
+                {
+                    "ansible.builtin.command": "/bin/true",
+                },
+            ],
+        },
+    ]
+    playbook_res = run_playbook(playbook)
+    assert playbook_res.returncode == 2, playbook_res.stdout
+
+    lines = playbook_res.stdout.split("\n")
+    json_begin = lines.index("{")
+    results_json = json.loads("\n".join(lines[json_begin:]))
+
+    # 4 plays ran
+    assert len(results_json["plays"]) == 4
+
+    # 1st play: 2x add_host
+    # 4th play: 1x command
+    assert results_json["stats"]["localhost"]["ok"] == 3
+    assert results_json["stats"]["localhost"]["failures"] == 0
+
+    # 2nd play + 3rd play
+    assert results_json["stats"][vm_1]["ok"] == 2
+    assert results_json["stats"][vm_1]["failures"] == 0
+
+    # 2nd play failed, 3rd must not be executed
+    assert results_json["stats"][vm_2]["ok"] == 0
+    assert results_json["stats"][vm_2]["failures"] == 1
+
+
+@pytest.mark.parametrize(
+    "ansible_config",
+    ["ansible_proxy_strategy", "ansible_linear_strategy"],
+)
+def test_playbook_execution_stops_whole_playbook_execution_when_all_hosts_fail(
+    vmname, run_playbook, request, qubes, ansible_config
+):
+    vm_1 = f"{vmname}_1"
+    vm_2 = f"{vmname}_2"
+
+    request.node.mark_vm_created(vm_1)
+    request.node.mark_vm_created(vm_2)
+
+    playbook = [
+        {
+            "hosts": "localhost",
+            "gather_facts": False,
+            "connection": "ansible.builtin.local",
+            "tasks": [
+                {
+                    "name": f"Create qube {vm_2}",
+                    "qubesos.core.qube": {"name": vm_1, "state": "present"},
+                },
+                {
+                    "name": f"Create qube {vm_2}",
+                    "qubesos.core.qube": {"name": vm_2, "state": "present"},
+                },
+            ],
+        },
+    ]
+
+    playbook_res = run_playbook(playbook)
+    assert playbook_res.returncode == 0, playbook_res.stdout
+    assert vm_1 in qubes.domains
+    assert vm_2 in qubes.domains
+
+    playbook = [
+        # 1st play, adding hosts to appvms group
+        {
+            "hosts": "localhost",
+            "gather_facts": False,
+            "connection": "ansible.builtin.local",
+            "tasks": [
+                {
+                    "ansible.builtin.add_host": {
+                        "name": vm_1,
+                        "groups": "appvms",
+                    },
+                },
+                {
+                    "ansible.builtin.add_host": {
+                        "name": vm_2,
+                        "groups": "appvms",
+                    },
+                },
+            ],
+        },
+        # 2nd play, make all vm fail
+        {
+            "hosts": "appvms",
+            "gather_facts": False,
+            "connection": "qubes",
+            "tasks": [
+                {
+                    "ansible.builtin.command": "/bin/false",
+                },
+            ],
+        },
+        # 3rd play - should not be executed
+        {
+            "hosts": "appvms",
+            "gather_facts": False,
+            "connection": "qubes",
+            "tasks": [
+                {
+                    "ansible.builtin.command": "/bin/true",
+                },
+            ],
+        },
+        # 4th play - should not be executed
+        {
+            "hosts": "localhost",
+            "gather_facts": False,
+            "connection": "ansible.builtin.local",
+            "tasks": [
+                {
+                    "ansible.builtin.command": "/bin/true",
+                },
+            ],
+        },
+    ]
+    playbook_res = run_playbook(playbook)
+    assert playbook_res.returncode == 2, playbook_res.stdout
+
+    lines = playbook_res.stdout.split("\n")
+    json_begin = lines.index("{")
+    results_json = json.loads("\n".join(lines[json_begin:]))
+
+    # Only 2 play ran
+    assert len(results_json["plays"]) == 2
+
+    # 1st play: 2x add_host
+    assert results_json["stats"]["localhost"]["ok"] == 2
+    assert results_json["stats"]["localhost"]["failures"] == 0
+
+    # 2nd play only
+    assert results_json["stats"][vm_1]["ok"] == 0
+    assert results_json["stats"][vm_1]["failures"] == 1
+    assert results_json["stats"][vm_2]["ok"] == 0
+    assert results_json["stats"][vm_2]["failures"] == 1
