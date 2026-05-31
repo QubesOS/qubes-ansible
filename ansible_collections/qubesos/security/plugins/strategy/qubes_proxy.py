@@ -35,6 +35,7 @@ import yaml
 
 from ansible import context
 from ansible.executor.play_iterator import PlayIterator
+from ansible.plugins.strategy import StrategyBase
 from ansible.plugins.strategy.linear import (
     StrategyModule as LinearStrategyModule,
 )
@@ -640,7 +641,6 @@ class StrategyModule(LinearStrategyModule):
                 # Mark host as failed
                 self._tqm._failed_hosts[host.name] = True
 
-
         # When all hosts failed, we should stop playbook execution
         if all(rc != 0 for rc in self.qubes_results.values()):
             return self._tqm.RUN_FAILED_BREAK_PLAY
@@ -692,4 +692,6 @@ class StrategyModule(LinearStrategyModule):
                 play_context,
             )
 
-        return max(retval_local_exec, retval_remote_exec)
+        retval = max(retval_local_exec, retval_remote_exec)
+        # StrategyBase run method will handle cleanup and return correct exit code
+        return StrategyBase.run(self, iterator, play_context, retval)
