@@ -33,7 +33,7 @@ r4.3:mgmt-host:
   extends: .mgmt-host-template
   needs:
     - r4.3:build:host-fc41
-    - r4.3:build:vm-fc42
+    - r4.3:build:vm-fc43
   variables:
     VM_IMAGE: qubes_4.3_64bit_stable.qcow2
 
