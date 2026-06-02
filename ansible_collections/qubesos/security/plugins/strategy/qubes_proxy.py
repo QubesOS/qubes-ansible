@@ -545,7 +545,7 @@ class StrategyModule(LinearStrategyModule):
         display.vvv(
             f"<QubesOS> Running play {play} " f"with {self._tqm._forks} forks"
         )
-        pool = multiprocessing.Pool(self._tqm._forks)
+        pool = multiprocessing.get_context("fork").Pool(self._tqm._forks)
 
         self.qubes_results = {}
         for host in self._inventory.get_hosts(play.hosts):
