@@ -22,8 +22,14 @@ import subprocess
 import tarfile
 import tempfile
 import traceback
+import types
 
+from multiprocessing.reduction import ForkingPickler
 from pathlib import Path
+
+# Ansible stores Role._hash as MappingProxyType. multiprocessing.Pool
+# pickles task args through ForkingPickler and mappingproxy isn't picklable.
+ForkingPickler.register(types.MappingProxyType, lambda mp: (dict, (dict(mp),)))
 
 import qubesadmin
 import qubesadmin.events.utils
@@ -392,7 +398,7 @@ class QubesPlayExecutor:
         )
 
     def _start_mgmt_disp_vm(self):
-        self.vvv("Lookup for dispvm_mgmt")
+        self.vvv(f"Lookup for dispvm_mgmt {self.dispvm_mgmt_name}")
         dispvm = self.app.domains.get(self.dispvm_mgmt_name)
         self.vvv(f"Found dispvm: {dispvm}")
         if dispvm is None:
