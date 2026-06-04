@@ -22,8 +22,14 @@ import subprocess
 import tarfile
 import tempfile
 import traceback
+import types
 
+from multiprocessing.reduction import ForkingPickler
 from pathlib import Path
+
+# Ansible stores Role._hash as MappingProxyType. multiprocessing.Pool
+# pickles task args through ForkingPickler and mappingproxy isn't picklable.
+ForkingPickler.register(types.MappingProxyType, lambda mp: (dict, (dict(mp),)))
 
 import qubesadmin
 import qubesadmin.events.utils
@@ -307,8 +313,14 @@ class QubesPlayExecutor:
         dest_roles_path = self.temp_dir / "roles"
         dest_roles_path.mkdir()
 
+        # A play may list the same role multiple times with different
+        # `when:` conditions; only copy each role directory once.
+        seen = set()
         for role in play.get_roles():
             role_path = Path(role.get_role_path())
+            if role_path.name in seen:
+                continue
+            seen.add(role_path.name)
             shutil.copytree(role_path, dest_roles_path / role_path.name)
 
     def _add_rpc_policies(self, dispvm_name):
@@ -386,7 +398,7 @@ class QubesPlayExecutor:
         )
 
     def _start_mgmt_disp_vm(self):
-        self.vvv("Lookup for dispvm_mgmt")
+        self.vvv(f"Lookup for dispvm_mgmt {self.dispvm_mgmt_name}")
         dispvm = self.app.domains.get(self.dispvm_mgmt_name)
         self.vvv(f"Found dispvm: {dispvm}")
         if dispvm is None:
@@ -533,7 +545,7 @@ class StrategyModule(LinearStrategyModule):
         display.vvv(
             f"<QubesOS> Running play {play} " f"with {self._tqm._forks} forks"
         )
-        pool = multiprocessing.Pool(self._tqm._forks)
+        pool = multiprocessing.get_context("fork").Pool(self._tqm._forks)
 
         self.qubes_results = {}
         for host in self._inventory.get_hosts(play.hosts):

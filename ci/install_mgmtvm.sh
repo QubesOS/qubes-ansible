@@ -42,7 +42,7 @@ mgmtvm mgmtvm                 allow target=dom0
 mgmtvm sys-net                allow target=dom0
 mgmtvm sys-firewall           allow target=dom0
 mgmtvm sys-usb                allow target=dom0
-mgmtvm fedora-42-xfce         allow target=dom0
+mgmtvm ${default_mgmt_dispvm_template} allow target=dom0
 mgmtvm debian-13-xfce         allow target=dom0
 EOF
 
@@ -50,7 +50,7 @@ cat << EOF >> /etc/qubes/policy.d/include/admin-local-ro
 mgmtvm sys-net                allow target=dom0
 mgmtvm sys-firewall           allow target=dom0
 mgmtvm sys-usb                allow target=dom0
-mgmtvm fedora-42-xfce         allow target=dom0
+mgmtvm ${default_mgmt_dispvm_template} allow target=dom0
 mgmtvm debian-13-xfce         allow target=dom0
 EOF
 
@@ -66,7 +66,7 @@ admin.vm.Create.TemplateVM       * mgmtvm dom0                   allow
 
 # You may want to allow the ManagementVM to clone some templates to create StandaloneVMs or new TemplateVMs
 admin.vm.volume.CloneFrom        * mgmtvm debian-13-xfce         allow target=dom0
-admin.vm.volume.CloneFrom        * mgmtvm fedora-42-xfce         allow target=dom0
+admin.vm.volume.CloneFrom        * mgmtvm ${default_mgmt_dispvm_template} allow target=dom0
 
 # And to remove created ones
 admin.vm.Remove                  * mgmtvm @tag:created-by-mgmtvm allow target=dom0
