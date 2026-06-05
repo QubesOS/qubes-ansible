@@ -38,6 +38,7 @@ import yaml
 
 from ansible import context
 from ansible.executor.play_iterator import PlayIterator
+from ansible.plugins.strategy import StrategyBase
 from ansible.plugins.strategy.linear import (
     StrategyModule as LinearStrategyModule,
 )
@@ -569,15 +570,32 @@ class StrategyModule(LinearStrategyModule):
                 stats.increment("ok", host.name)
             else:
                 stats.increment("failures", host.name)
+                # Mark host as failed
+                self._tqm._failed_hosts[host.name] = True
 
-        return max(self.qubes_results.values())
+        # When all hosts failed, we should stop playbook execution
+        if all(rc != 0 for rc in self.qubes_results.values()):
+            return self._tqm.RUN_FAILED_BREAK_PLAY
+
+        # When at least one failure occurred but not for all hosts, mark this
+        # play as failed but continue playbook execution
+        if any(rc != 0 for rc in self.qubes_results.values()):
+            return self._tqm.RUN_FAILED_HOSTS
+
+        # When no error, it's OK!
+        return self._tqm.RUN_OK
 
     def run(self, iterator, play_context):
         play = iterator._play
 
+        # Get previously failed hosts and ignore them.
+        previously_failed = set(iterator.get_failed_hosts().keys())
         target_hosts = self._inventory.get_hosts(play.hosts)
         local_hosts = [
-            host for host in target_hosts if host.name in ["localhost", "dom0"]
+            host
+            for host in target_hosts
+            if host.name in ["localhost", "dom0"]
+            and host.name not in previously_failed
         ]
         retval_local_exec = self._tqm.RUN_OK
 
@@ -585,6 +603,7 @@ class StrategyModule(LinearStrategyModule):
             host
             for host in target_hosts
             if host.name not in ["localhost", "dom0"]
+            and host.name not in previously_failed
         ]
         retval_remote_exec = self._tqm.RUN_OK
 
@@ -605,4 +624,6 @@ class StrategyModule(LinearStrategyModule):
                 play_context,
             )
 
-        return max(retval_local_exec, retval_remote_exec)
+        retval = max(retval_local_exec, retval_remote_exec)
+        # StrategyBase run method will handle cleanup and return correct exit code
+        return StrategyBase.run(self, iterator, play_context, retval)
