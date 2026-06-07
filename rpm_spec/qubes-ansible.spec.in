@@ -11,7 +11,7 @@ BuildArch:  noarch
 Source0:    %{name}-%{version}.tar.gz
 
 Requires:   ansible
-Requires:   qubes-core-admin-client
+Requires:   qubes-core-admin-client >= 4.3.33
 
 BuildRequires: make
 

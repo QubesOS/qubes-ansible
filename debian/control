@@ -10,7 +10,7 @@ Package: qubes-ansible
 Architecture: any
 Depends:
  ansible,
- qubes-core-admin-client,
+ qubes-core-admin-client (>= 4.3.33),
  ${python3:Depends},
  ${misc:Depends}
 Recommends: qubes-ansible-vm
