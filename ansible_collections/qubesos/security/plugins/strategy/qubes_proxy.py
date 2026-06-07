@@ -83,9 +83,11 @@ QFILE_AGENT_PATH_VM = "/usr/lib/qubes/qfile-agent"
 
 DISPVM_NAME_MAXLEN = 31
 
+QUBES_PLAY_EXECUTORS = {}
 
-def run_play_executor(iterator, play_context):
-    return QubesPlayExecutor(iterator, play_context).run()
+
+def run_play_executor(host):
+    return QUBES_PLAY_EXECUTORS[host].run()
 
 
 def filter_control_chars(text: bytes):
@@ -140,15 +142,14 @@ class QubesPlayExecutor:
     def __init__(self, iterator, play_context):
         self.app = qubesadmin.Qubes()
         self.host = iterator._play.hosts[0]
-        self.loader = play_context._loader
-        if self.loader == None:
+        self.loader = iterator._variable_manager._loader
+        if self.loader is None:
             self.loader = DataLoader()
         self.inventory = iterator._variable_manager._inventory
         self.iterator = iterator
         self.play = iterator._play
         self.play_context = play_context
         self.variable_manager = iterator._variable_manager
-        self.variable_manager._loader = self.loader
 
         self._dispvm_initially_running = False
 
@@ -546,18 +547,30 @@ class StrategyModule(LinearStrategyModule):
         display.vvv(
             f"<QubesOS> Running play {play} " f"with {self._tqm._forks} forks"
         )
-        pool = multiprocessing.get_context("fork").Pool(self._tqm._forks)
-
         self.qubes_results = {}
+
+        # Passing new_iterator and play_context directly to QubesPlayExecutor.__init__ with
+        # apply_async looses data when they get pickled
+        # use a global variable to avoid this
+        global QUBES_PLAY_EXECUTORS
+        QUBES_PLAY_EXECUTORS = {}
+
+        # create an executor for each host
         for host in self._inventory.get_hosts(play.hosts):
             self.qubes_results[host] = 255
-
             new_iterator = self._new_play_iterator_with_hosts(
                 iterator, play_context, [host]
             )
+            QUBES_PLAY_EXECUTORS[host.name] = QubesPlayExecutor(
+                new_iterator, play_context
+            )
+
+        # Now that everything is ready, run the executor for each host using multiprocessing
+        pool = multiprocessing.get_context("fork").Pool(self._tqm._forks)
+        for host in self.qubes_results:
             pool.apply_async(
                 run_play_executor,
-                (new_iterator, play_context),
+                (host.name,),
                 callback=self.collect_result,
                 error_callback=self.collect_error,
             )
