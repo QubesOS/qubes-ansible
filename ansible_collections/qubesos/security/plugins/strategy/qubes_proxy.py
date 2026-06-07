@@ -448,10 +448,15 @@ class QubesPlayExecutor:
                 localcmd = QFILE_AGENT_PATH_VM
 
             localcmd += f" {tar_file_path}"
-            dispvm.run_service(
+            filecopy_rc = dispvm.run_service(
                 "qubes.Filecopy",
                 localcmd=localcmd,
             ).wait()
+            if filecopy_rc != 0:
+                raise RuntimeError(
+                    f"qubes.Filecopy failed (exit {filecopy_rc}) — "
+                    f"could not transfer playbook archive to {dispvm.name}"
+                )
 
             self.vvv(f"Running qubes.AnsibleVM on {self.vm}")
             p = dispvm.run_service("qubes.AnsibleVM")
@@ -468,11 +473,22 @@ class QubesPlayExecutor:
             self.vvvv(f"stdout: {untrusted_stdout}")
             self.vvvv(f"stderr: {untrusted_stderr}")
             self.vvvv(f"return code: {p.returncode}")
+
+            stdout = filter_control_chars(untrusted_stdout).decode("utf-8")
+            stderr = filter_control_chars(untrusted_stderr).decode("utf-8")
+
+            if p.returncode != 0 and not stdout and not stderr:
+                stderr = (
+                    f"qubes.AnsibleVM exited with code {p.returncode} and produced no output.\n"
+                    f"The service may not be installed in the template of {dispvm.name}.\n"
+                    f"Ensure qubes-ansible-vm is installed in that template and the VM was restarted."
+                )
+
             return (
                 self.host,
                 p.returncode,
-                filter_control_chars(untrusted_stdout).decode("utf-8"),
-                filter_control_chars(untrusted_stderr).decode("utf-8"),
+                stdout,
+                stderr,
                 self.dispvm_mgmt_name,
                 self.play.name,
             )
@@ -535,6 +551,8 @@ class StrategyModule(LinearStrategyModule):
     def collect_result(self, result_tuple):
         host, retcode, stdout, stderr, dispvm, play_name = result_tuple
         display.banner(f"QUBESOS [{dispvm}: PLAY {play_name}]")
+        if retcode != 0:
+            display.display(f"Exit code: {retcode}", "red")
         if stderr:
             display.display(str(stderr), "red")
         if stdout:
