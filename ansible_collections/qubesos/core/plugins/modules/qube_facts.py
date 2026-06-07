@@ -186,7 +186,7 @@ def core(module):
                 },
                 "notes": qube.get_notes(),
                 "services": {
-                    feat[len("service.")]: bool(qube.features[feat])
+                    feat[len("service.") :]: bool(qube.features[feat])
                     for feat in qube.features
                     if feat.startswith("service.")
                 },
