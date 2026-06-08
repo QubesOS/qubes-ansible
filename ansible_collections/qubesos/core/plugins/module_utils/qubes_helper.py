@@ -19,9 +19,6 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from contextlib import suppress
-
-import asyncio
 import time
 
 try:
@@ -140,23 +137,12 @@ class QubesHelper(object):
         ``qvm-shutdown --force``).
         """
         vm = self.get_vm(vmname)
-        with suppress(QubesVMNotStartedError):
-            vm.shutdown(force=force)
-
-        if wait:
-            try:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                loop.run_until_complete(
-                    asyncio.wait_for(
-                        qubesadmin.events.utils.wait_for_domain_shutdown([vm]),
-                        vm.shutdown_timeout,
-                    )
-                )
-            except asyncio.TimeoutError:
-                raise RuntimeError(
-                    f"Timeout: VM {vmname} did not halt within {vm.shutdown_timeout}s"
-                )
+        try:
+            vm.shutdown(force=force, wait=wait)
+        except qubesadmin.exc.QubesVMNotStartedError:
+            pass
+        except qubesadmin.exc.QubesException as e:
+            raise RuntimeError(f"Timeout: VM {vmname} did not halt: {str(e)}")
         return 0
 
     def restart(self, vmname, wait=False, force=False):

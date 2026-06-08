@@ -27,8 +27,8 @@ fedora_ver="$(echo "$default_mgmt_dispvm_template" | cut -d- -f2)"
 repo_dir="artifacts/repository/vm-fc${fedora_ver}"
 [[ -d "$repo_dir" ]] || err_ex "'$repo_dir' not found"
 
-qvm-run -p -u root --no-gui mgmtvm "dnf update -y"
-qvm-run -p -u root --no-gui  mgmtvm "dnf install -y python3-coverage /home/user/QubesIncoming/dom0/*.rpm"
+qvm-run -p -u root --no-gui mgmtvm "dnf update -y --enablerepo=qubes*current-testing"
+qvm-run -p -u root --no-gui  mgmtvm "dnf install -y --enablerepo=qubes*current-testing python3-coverage /home/user/QubesIncoming/dom0/*.rpm"
 
 cat << EOF >> /etc/qubes/policy.d/include/admin-local-rwx
 mgmtvm @tag:created-by-mgmtvm allow target=dom0

@@ -20,5 +20,5 @@ find $repo_dir -name 'qubes-ansible-*.noarch.rpm' \
     -not -name  'qubes-ansible-tests*.noarch.rpm' \
     -exec qvm-copy-to-vm "$default_mgmt_dispvm_template" "{}" \;
 
-qvm-run --pass-io "$default_mgmt_dispvm_template" "sudo dnf install -y /home/user/QubesIncoming/dom0/*.rpm"
+qvm-run --pass-io "$default_mgmt_dispvm_template" "sudo dnf install -y --enablerepo=qubes*current-testing /home/user/QubesIncoming/dom0/*.rpm"
 qvm-shutdown --wait "$default_mgmt_dispvm_template"
