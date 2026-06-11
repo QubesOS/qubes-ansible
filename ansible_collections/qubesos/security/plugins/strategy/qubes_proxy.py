@@ -17,6 +17,7 @@
 
 import multiprocessing
 import os
+import re
 import shutil
 import subprocess
 import tarfile
@@ -37,6 +38,7 @@ import qubesadmin.exc
 import yaml
 
 from ansible import context
+from ansible.errors import AnsibleError
 from ansible.executor.play_iterator import PlayIterator
 from ansible.plugins.strategy import StrategyBase
 from ansible.plugins.strategy.linear import (
@@ -136,10 +138,15 @@ def filter_control_chars(text: bytes):
     return new_buff
 
 
+class QubesProxyError(AnsibleError):
+    def __init__(self, msg):
+        super().__init__(f"QubesProxy - {msg}")
+
+
 class QubesPlayExecutor:
     """Run plays on a given host through its management disposable VM"""
 
-    def __init__(self, iterator, play_context):
+    def __init__(self, iterator, play_context, vault_secrets):
         self.app = qubesadmin.Qubes()
         self.host = iterator._play.hosts[0]
         self.loader = iterator._variable_manager._loader
@@ -150,6 +157,7 @@ class QubesPlayExecutor:
         self.play = iterator._play
         self.play_context = play_context
         self.variable_manager = iterator._variable_manager
+        self.vault_secrets = vault_secrets
 
         self._dispvm_initially_running = False
 
@@ -166,6 +174,10 @@ class QubesPlayExecutor:
     @property
     def dispvm_mgmt_name(self):
         return f"disp-mgmt-{self.host_name}"[:DISPVM_NAME_MAXLEN]
+
+    @property
+    def tar_file_path(self):
+        return self.temp_dir.parent / f"{self.temp_dir.name}.tar"
 
     def _add_host_vars(self):
         """Build host variables files
@@ -325,6 +337,23 @@ class QubesPlayExecutor:
             seen.add(role_path.name)
             shutil.copytree(role_path, dest_roles_path / role_path.name)
 
+    def _add_vault_secrets(self):
+        """Adds vault secrets files
+
+        These files will be used by ansible-playbook in the DispVM to
+        decrypt the copied vaults
+        """
+        if not self.vault_secrets:
+            return
+
+        vault_secrets_dir = self.temp_dir / "vault_secrets"
+        vault_secrets_dir.mkdir(mode=0o700)
+
+        for vault_id, vault_secret in self.vault_secrets.items():
+            vault_secret_file = vault_secrets_dir / vault_id
+            vault_secret_file.touch(mode=0o600)
+            vault_secret_file.write_bytes(vault_secret)
+
     def _add_rpc_policies(self, dispvm_name):
         self._call_ansible_service_rpc(
             "ansible.CreateManagementPolicies", dispvm_name
@@ -353,8 +382,7 @@ class QubesPlayExecutor:
 
         return subprocess.check_output(command, env=env).decode()
 
-    @staticmethod
-    def _build_ansible_args():
+    def _build_ansible_args(self):
         args = []
         current_args = context.CLIARGS
 
@@ -372,6 +400,13 @@ class QubesPlayExecutor:
             for tag in skip_tags:
                 args += ["--skip-tags", tag]
 
+        for vault_id in self.vault_secrets:
+            vault_path_file = os.path.join("vault_secrets", vault_id)
+            if vault_id == "default":
+                args += ["--vault-password-file", vault_path_file]
+            else:
+                args += ["--vault-id", f"{vault_id}@{vault_path_file}"]
+
         for boolean_arg in ["check", "diff", "force_handlers", "flush_cache"]:
             if current_args.get(boolean_arg):
                 args.append(f"--{boolean_arg.replace('_', '-')}")
@@ -379,7 +414,9 @@ class QubesPlayExecutor:
         return args
 
     def _build_tar(self):
-        tar_file_path = self.temp_dir.parent / f"{self.temp_dir.name}.tar"
+        tar_file_path = self.tar_file_path
+        # the tar may contain vault secrets, keep it private
+        tar_file_path.touch(mode=0o600)
         old_path = os.getcwd()
         os.chdir(self.temp_dir)
         with tarfile.open(tar_file_path, "w") as tar_file:
@@ -432,13 +469,14 @@ class QubesPlayExecutor:
         dispvm = self._start_mgmt_disp_vm()
 
         self._add_rpc_policies(dispvm.name)
-        self.temp_dir.mkdir()
+        self.temp_dir.mkdir(mode=0o700)
 
         try:
             self._add_play(self.play)
             self._add_roles(self.play)
             self._add_host_vars()
             self._add_inventory()
+            self._add_vault_secrets()
             tar_file_path = self._build_tar()
             ansible_args = self._build_ansible_args()
 
@@ -497,6 +535,8 @@ class QubesPlayExecutor:
         finally:
             self._remove_rpc_policies(dispvm.name)
             shutil.rmtree(self.temp_dir)
+            # the tar may contain vault secrets, do not leave it behind
+            self.tar_file_path.unlink(missing_ok=True)
             if not self._dispvm_initially_running:
                 self.vvv(f"Stopping {dispvm.name}")
                 dispvm.kill()
@@ -562,6 +602,47 @@ class StrategyModule(LinearStrategyModule):
 
     def proxy_run(self, iterator, play_context):
         play = iterator._play
+        variable_manager = iterator._variable_manager
+
+        # check if users requested to pass Vault secrets to the DispVM
+        vault_secrets_to_pass = {}
+        qubes_proxy_pass_vault_secret = variable_manager.get_vars(
+            play=play
+        ).get("qubes_proxy_pass_vault_secret")
+        if qubes_proxy_pass_vault_secret:
+            if not isinstance(qubes_proxy_pass_vault_secret, list):
+                raise QubesProxyError(
+                    "Malformed variable 'qubes_proxy_pass_vault_secret': "
+                    f"list expected, got {type(qubes_proxy_pass_vault_secret)}"
+                )
+
+            # vault.secrets => list of [<vault id>, <ansible.parsing.vault.VaultSecret>]
+            vault_secrets = {
+                vault_entry[0]: vault_entry[1].bytes
+                for vault_entry in variable_manager._loader._vault.secrets
+            }
+
+            for vault_id in qubes_proxy_pass_vault_secret:
+                # the vault id is used as a file name in the DispVM and in
+                # the --vault-id <id>@<file> argument
+                if not re.fullmatch(r"[\w.-]+", str(vault_id)):
+                    raise QubesProxyError(
+                        f"Invalid vault id '{vault_id}': only letters, "
+                        "digits, '_', '.' and '-' are allowed"
+                    )
+                try:
+                    vault_secrets_to_pass[vault_id] = vault_secrets[vault_id]
+                except KeyError:
+                    raise QubesProxyError(
+                        "Trying to pass vault secret of an unknown vault: "
+                        f"{vault_id}"
+                    )
+
+            display.vvv(
+                "<QubesOS> Secrets of the following vault(s) will be "
+                f"copied: {', '.join(vault_secrets_to_pass.keys())}"
+            )
+
         display.vvv(
             f"<QubesOS> Running play {play} " f"with {self._tqm._forks} forks"
         )
@@ -580,7 +661,7 @@ class StrategyModule(LinearStrategyModule):
                 iterator, play_context, [host]
             )
             QUBES_PLAY_EXECUTORS[host.name] = QubesPlayExecutor(
-                new_iterator, play_context
+                new_iterator, play_context, vault_secrets_to_pass
             )
 
         # Now that everything is ready, run the executor for each host using multiprocessing

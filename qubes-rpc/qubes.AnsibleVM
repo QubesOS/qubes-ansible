@@ -10,14 +10,17 @@ for i in $(seq 100); do
   ansible_args+=("$item")
 done
 
-temp_dir="$(mktemp -d)"
-
-# shellcheck disable=SC2064
-trap "rm -rf '$temp_dir'" EXIT
-
 tar_file_path="/home/user/QubesIncoming/${QREXEC_REMOTE_DOMAIN}/${tar_file}"
 [ -f "$tar_file_path" ] || exit 1
 
-tar -C "$temp_dir" -xf "$tar_file_path"
+temp_dir="$(mktemp -d)"
 
-ANSIBLE_FORCE_COLOR=True ansible-playbook -i "${temp_dir}/inventory" "${ansible_args[@]}" "${temp_dir}/playbook.yaml"
+# the tar may contain vault secrets, do not leave it behind
+# shellcheck disable=SC2064
+trap "rm -rf '$temp_dir' '$tar_file_path'" EXIT
+
+tar -C "$temp_dir" -xf "$tar_file_path" || exit 1
+
+cd "$temp_dir" || exit 1
+
+ANSIBLE_FORCE_COLOR=True ansible-playbook -i "inventory" "${ansible_args[@]}" "playbook.yaml"
