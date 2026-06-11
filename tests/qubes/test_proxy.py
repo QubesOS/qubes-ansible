@@ -11,6 +11,7 @@ from ansible.executor.task_queue_manager import TaskQueueManager
 from ansible.module_utils.common.collections import ImmutableDict
 from ansible.inventory.manager import InventoryManager
 from ansible.parsing.dataloader import DataLoader
+from ansible.parsing.vault import VaultLib, VaultSecret
 from ansible.playbook.play import Play
 from ansible.plugins.callback import CallbackBase
 from ansible.plugins.loader import strategy_loader
@@ -699,3 +700,48 @@ def test_executor_loader_comes_from_variable_manager(monkeypatch, vm):
     # return code will be something like 8
     # (TaskQueueManager.RUN_FAILED_BREAK_PLAY)
     assert res == 0
+
+
+def test_proxy_with_vault_variable(run_playbook, vm, tmp_path):
+    vault_password = "test-vault-pass"
+    vault_secret = VaultSecret(vault_password.encode())
+    vault = VaultLib(secrets=[("default", vault_secret)])
+
+    vault_vars_dir = tmp_path / "host_vars"
+    vault_vars_dir.mkdir()
+    encrypted = vault.encrypt(
+        yaml.safe_dump({"vault_var": "vault_secret_value"})
+    )
+    (vault_vars_dir / f"{vm.name}.yaml").write_bytes(encrypted)
+
+    vault_pass_file = tmp_path / ".vault_pass"
+    vault_pass_file.write_text(vault_password)
+
+    playbook = [
+        {
+            "hosts": vm.name,
+            "tasks": [
+                {
+                    "fail": {"msg": "undefined var {{ item }}"},
+                    "when": "lookup('vars', item) is undefined",
+                    "loop": [
+                        "vault_var",
+                    ],
+                }
+            ],
+        }
+    ]
+
+    inventory = {
+        "appvms": [[vm.name]],
+    }
+
+    result = run_playbook(
+        playbook,
+        inventory=inventory,
+        extra_args=["--vault-password-file", str(vault_pass_file)],
+    )
+    assert result.returncode == 0, result.stderr
+    assert (
+        "Could not match supplied host pattern" not in result.stderr
+    ), result.stderr
