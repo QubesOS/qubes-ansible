@@ -1,3 +1,40 @@
+qubes-ansible (1.4.2-1) unstable; urgency=medium
+
+  [ Marek Marczykowski-Górecki ]
+  * ci: update job deps for default-mgmt-dvm
+
+  [ Frédéric Pierret (fepitre) ]
+  * ci: switch ansible-deploy needs from vm-fc42 to vm-fc43
+  * ci: use docker-style VM_IMAGE ref for r4.3:mgmt-host
+  * qubes_proxy: dedupe roles in _add_roles
+  * qubes_proxy: make ansible Role._hash picklable
+  * qubes_proxy: pin multiprocessing.Pool to fork context
+
+  [ Guillaume Chinal ]
+  * proxy: mark hosts when failed and skip them for next plays
+  * proxy: interrupt playbook execution when all hosts failed a play
+  * proxy: let StrategyBase.run returning the relevant exit code
+  * proxy: add tests for playbook interruption when hosts failed
+
+  [ deeplow ]
+  * Fix services fact (would return single char)
+
+  [ Guillaume Chinal ]
+  * proxy: display an error when running a service on the dispvm fails
+
+  [ Ben Grande ]
+  * Wait for domain shutdown with API argument
+
+  [ Marek Marczykowski-Górecki ]
+  * Bump qubes-core-admin-client requirement for vm.shutdown(wait=True)
+  * ci: enable current-testing when installing packages to test
+
+  [ Guillaume Chinal ]
+  * proxy: fix loader loss in QubesPlayExecutor
+  * proxy: add test with vault variable
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Fri, 12 Jun 2026 10:56:11 +0200
+
 qubes-ansible (1.4.1-1) unstable; urgency=medium
 
   * Rename source package from qubes-ansible-vm to qubes-ansible
