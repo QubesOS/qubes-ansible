@@ -11,6 +11,7 @@ from ansible.executor.task_queue_manager import TaskQueueManager
 from ansible.module_utils.common.collections import ImmutableDict
 from ansible.inventory.manager import InventoryManager
 from ansible.parsing.dataloader import DataLoader
+from ansible.parsing.vault import VaultLib, VaultSecret
 from ansible.playbook.play import Play
 from ansible.plugins.callback import CallbackBase
 from ansible.plugins.loader import strategy_loader
@@ -19,6 +20,10 @@ from ansible import context
 from ansible.plugins.strategy.linear import (
     StrategyModule as LinearStrategyModule,
 )
+from ansible_collections.qubesos.security.plugins.strategy.qubes_proxy import (
+    QubesPlayExecutor,
+)
+
 from unittest.mock import Mock
 
 
@@ -600,3 +605,143 @@ def test_proxy_routing_dom0_host(ansible_mock):
     ansible.run(play)
     assert ansible.proxy_runs == {"work1": 1, "work2": 1}
     assert ansible.linear_runs == {"localhost": 1, "dom0": 1}
+
+
+def test_executor_loader_comes_from_variable_manager(monkeypatch, vm):
+    """QubesPlayExecutor.loader must be taken from variable_manager._loader.
+
+    play_context never carries a loader; if __init__ falls back to a fresh
+    DataLoader() it silently discards vault secrets.
+    """
+    hosts = [vm.name]
+
+    loader = DataLoader()
+    # fill loader will vault secrets to ensure it isn't dropped when
+    # forking
+    loader.set_vault_secrets(["abc"])
+    context.CLIARGS = ImmutableDict(
+        connection="smart",
+        module_path=["/usr/share/ansible"],
+        forks=1,
+        become=None,
+        become_method=None,
+        become_user=None,
+        check=False,
+        diff=False,
+    )
+    sources = ",".join(hosts)
+    if len(hosts) == 1:
+        sources += ","
+    results_callback = ResultsCollectorJSONCallback()
+
+    inventory = InventoryManager(loader=loader, sources=sources)
+    variable_manager = VariableManager(loader=loader, inventory=inventory)
+    tqm = TaskQueueManager(
+        inventory=inventory,
+        variable_manager=variable_manager,
+        loader=loader,
+        passwords={},
+        stdout_callback=results_callback,
+        # Use our custom callback instead of the ``default`` callback plugin, which prints to stdout
+    )
+
+    # required to be set for strategy_loader
+    tqm._workers = None
+
+    import sys
+
+    strategy = strategy_loader.get("qubes_proxy", tqm=tqm)
+    monkeypatch.setattr(strategy_loader, "get", Mock(return_value=strategy))
+
+    strategy_module = sys.modules[strategy.__class__.__module__]
+
+    class MockedQubesPlayExecutor(QubesPlayExecutor):
+        def run(self):
+            # Fail this host, then last test check will be KO
+            assert self.variable_manager._loader is not None
+            assert self.variable_manager._loader == loader
+            assert self.variable_manager._loader._vault.secrets == ["abc"]
+
+            return (
+                self.host,
+                0,
+                "",
+                "",
+                "",
+                "",
+            )
+
+    monkeypatch.setattr(
+        strategy_module, "QubesPlayExecutor", MockedQubesPlayExecutor
+    )
+
+    play = Play().load(
+        {
+            "name": "Simple Play",
+            "hosts": hosts,
+            "gather_facts": "no",
+            "strategy": "qubes_proxy",
+            "tasks": [
+                {
+                    "action": {
+                        "module": "command",
+                        "args": {"cmd": "/usr/bin/uptime"},
+                    }
+                }
+            ],
+        },
+        variable_manager=variable_manager,
+        loader=loader,
+    )
+
+    res = tqm.run(play)
+
+    # If an error is raised in 'run' method
+    # return code will be something like 8
+    # (TaskQueueManager.RUN_FAILED_BREAK_PLAY)
+    assert res == 0
+
+
+def test_proxy_with_vault_variable(run_playbook, vm, tmp_path):
+    vault_password = "test-vault-pass"
+    vault_secret = VaultSecret(vault_password.encode())
+    vault = VaultLib(secrets=[("default", vault_secret)])
+
+    vault_vars_dir = tmp_path / "host_vars"
+    vault_vars_dir.mkdir()
+    encrypted = vault.encrypt(
+        yaml.safe_dump({"vault_var": "vault_secret_value"})
+    )
+    (vault_vars_dir / f"{vm.name}.yaml").write_bytes(encrypted)
+
+    vault_pass_file = tmp_path / ".vault_pass"
+    vault_pass_file.write_text(vault_password)
+
+    playbook = [
+        {
+            "hosts": vm.name,
+            "tasks": [
+                {
+                    "fail": {"msg": "undefined var {{ item }}"},
+                    "when": "lookup('vars', item) is undefined",
+                    "loop": [
+                        "vault_var",
+                    ],
+                }
+            ],
+        }
+    ]
+
+    inventory = {
+        "appvms": [[vm.name]],
+    }
+
+    result = run_playbook(
+        playbook,
+        inventory=inventory,
+        extra_args=["--vault-password-file", str(vault_pass_file)],
+    )
+    assert result.returncode == 0, result.stderr
+    assert (
+        "Could not match supplied host pattern" not in result.stderr
+    ), result.stderr
