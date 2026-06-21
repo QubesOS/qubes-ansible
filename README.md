@@ -112,6 +112,47 @@ the symlink before building the archive.
 
 See the [examples](EXAMPLES.md) for sample playbooks and role tasks demonstrating common usage scenarios.
 
+## Vault
+
+Ansible Vault can be used together with the proxy strategy in two different ways.
+
+### 1. Encrypted variables (decrypted in dom0 / ManagementVM)
+
+When you encrypt variables stored in your inventory (`host_vars`, `group_vars`) or in
+vault-encrypted vars files, they are decrypted where Ansible runs (dom0 or the
+ManagementVM). The proxy strategy then treats them like any other host variable: they are
+merged into the single `host_vars/<host>.yaml` file that is copied to the disposable VM.
+
+This means the values travel to the disposable VM **in clear text** inside that concatenated
+YAML file, and the vault password is **never** copied to the disposable VM. Use this when it
+is acceptable for dom0 / the ManagementVM to see the decrypted values, or when you don't want to copy the vault file to the disposable VM.
+
+### 2. Passing vault secrets to the disposable VM
+
+If, instead, you want vault-encrypted content to be decrypted **inside the disposable VM**
+(for example to keep an encrypted file encrypted until it reaches the target), set the
+`qubes_proxy_pass_vault_secret` variable in the play variables to the list of vault ids whose passwords should be
+forwarded to the disposable VM:
+
+```yaml
+- hosts: work
+  connection: qubes
+  strategy: qubes_proxy
+  vars:
+    qubes_proxy_pass_vault_secret:
+      - default
+      - dev
+```
+
+The matching vault passwords are then copied to the disposable VM and passed to
+`ansible-playbook` (as `--vault-password-file` for the `default` id, or `--vault-id
+<id>@<file>` for any other id), so decryption happens on the disposable VM rather than in
+dom0 / the ManagementVM.
+
+The vault passwords must be available to the top-level `ansible-playbook` invocation (e.g.
+via `--vault-id <id>@<source>`), and only the ids listed in `qubes_proxy_pass_vault_secret`
+are forwarded. Requesting an unknown vault id stops execution with an error.
+
 ## Limitations
 
 The proxy plugin may modify the behavior of your playbooks. Please notice the following indications and 
