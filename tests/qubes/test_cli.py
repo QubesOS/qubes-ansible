@@ -2,6 +2,7 @@ import subprocess
 import uuid
 import json
 import pytest
+import yaml
 
 from conftest import PLUGIN_PATH
 
@@ -647,3 +648,129 @@ def test_playbook_execution_stops_whole_playbook_execution_when_all_hosts_fail(
     assert results_json["stats"][vm_1]["failures"] == 1
     assert results_json["stats"][vm_2]["ok"] == 0
     assert results_json["stats"][vm_2]["failures"] == 1
+
+
+def _generate_vault_and_role(tmp_path, vault_id=None):
+    vault_content = {"var_from_role_vault": "my_role_var"}
+    role_content = [
+        {"ansible.builtin.assert": {"that": "var_from_role_vault is defined"}},
+    ]
+    vault_secret = "Secret123!"
+
+    roles_path = tmp_path / "roles"
+    roles_path.mkdir()
+    my_role_path = roles_path / "my_role"
+    my_role_path.mkdir()
+    (my_role_path / "tasks").mkdir()
+    (my_role_path / "vars").mkdir()
+    vault_path = (my_role_path / "vars") / "main.yml"
+    role_main_path = (my_role_path / "tasks") / "main.yml"
+
+    yaml.dump(vault_content, vault_path.open("w"))
+    yaml.dump(role_content, role_main_path.open("w"))
+
+    secret_file = tmp_path / "secret.txt"
+    secret_file.write_text(vault_secret)
+
+    # Create the vault
+    if vault_id:
+        args = [
+            "--vault-id",
+            f"my_role@{secret_file}",
+            vault_path,
+        ]
+    else:
+        args = [
+            "--vault-password-file",
+            secret_file,
+            vault_path,
+        ]
+
+    result = subprocess.run(["ansible-vault", "encrypt", *args])
+
+    assert result.returncode == 0
+    assert "AES" in vault_path.read_text()
+
+
+@pytest.mark.parametrize(
+    "ansible_config",
+    ["ansible_proxy_strategy"],
+)
+def test_playbook_with_vault_in_role_no_password(
+    vm, run_playbook, tmp_path, ansible_config
+):
+    _generate_vault_and_role(tmp_path)
+
+    playbook = [
+        {
+            "hosts": vm.name,
+            "gather_facts": False,
+            "connection": "qubesos.security.qubes_proxy",
+            "roles": ["my_role"],
+        }
+    ]
+
+    result = run_playbook(playbook_content=playbook, vms=[vm.name])
+    assert result.returncode != 0
+    assert (
+        "ERROR! Attempting to decrypt but no vault secrets found"
+        in result.stderr
+    )
+
+
+@pytest.mark.parametrize(
+    "ansible_config",
+    ["ansible_proxy_strategy"],
+)
+def test_playbook_with_vault_with_vault_password_file(
+    vm, run_playbook, tmp_path, ansible_config
+):
+    _generate_vault_and_role(tmp_path)
+
+    playbook = [
+        {
+            "hosts": vm.name,
+            "gather_facts": False,
+            "connection": "qubesos.security.qubes_proxy",
+            "roles": ["my_role"],
+            "vars": {"qubes_proxy_pass_vault_secret": ["default"]},
+        }
+    ]
+
+    result = run_playbook(
+        playbook_content=playbook,
+        vms=[vm.name],
+        extra_args=["--vault-password-file", tmp_path / "secret.txt"],
+    )
+    assert result.returncode == 0
+
+
+@pytest.mark.parametrize(
+    "ansible_config",
+    ["ansible_proxy_strategy"],
+)
+def test_playbook_with_vault_with_vault_id(
+    vm, run_playbook, tmp_path, ansible_config
+):
+    _generate_vault_and_role(tmp_path, "my_role")
+
+    playbook = [
+        {
+            "hosts": vm.name,
+            "gather_facts": False,
+            "connection": "qubesos.security.qubes_proxy",
+            "roles": ["my_role"],
+            "vars": {
+                "qubes_proxy_pass_vault_secret": [
+                    "my_role",
+                ]
+            },
+        }
+    ]
+
+    result = run_playbook(
+        playbook_content=playbook,
+        vms=[vm.name],
+        extra_args=["--vault-id", f"my_role@{tmp_path / 'secret.txt'}"],
+    )
+    assert result.returncode == 0

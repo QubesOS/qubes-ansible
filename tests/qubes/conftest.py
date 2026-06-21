@@ -1,6 +1,8 @@
 import subprocess
+import shutil
 import sys
 import uuid
+import yaml
 
 import pytest
 import qubesadmin
@@ -185,12 +187,16 @@ def run_playbook(tmp_path, ansible_config):
     ansible_config_path = Path(__file__).parent.parent / f"{ansible_config}.cfg"
     assert ansible_config_path.is_file()
 
-    def _run(playbook_content: List[dict], vms: List[str] = []):
+    def _run(
+        playbook_content: List[dict],
+        vms: List[str] = [],
+        extra_args=[],
+        roles_path=None,
+    ):
         # Create playbook file
         pb_file = tmp_path / "playbook.yml"
-        import yaml
-
         pb_file.write_text(yaml.dump(playbook_content))
+
         # Run ansible-playbook
         cmd = [
             "ansible-playbook",
@@ -198,6 +204,7 @@ def run_playbook(tmp_path, ansible_config):
             f"localhost,dom0,{','.join(vms)}",
             "-c",
             "local",
+            *extra_args,
             "-M",
             str(PLUGIN_PATH),
             str(pb_file),
