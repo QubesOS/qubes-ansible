@@ -87,3 +87,14 @@ def test_volumes(vm):
         if vol["name"] == "private"
     )
     assert private_vol["revisions_to_keep"] == 5
+
+
+def test_gather_template_vm_disabled(vm):
+    res = run_module({"name": vm.name})
+    assert "template_vm" not in res["ansible_facts"]["qubes_facts"]
+
+
+def test_gather_template_vm_appvm(vm):
+    res = run_module({"name": vm.name, "gather_template_vm": True})
+    assert "template_vm" in res["ansible_facts"]["qubes_facts"]
+    assert res["ansible_facts"]["qubes_facts"]["template_vm"] == vm.template.name
