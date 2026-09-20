@@ -199,7 +199,6 @@ from ansible_collections.qubesos.core.plugins.module_utils.qubes_module_command 
 
 import traceback
 
-
 try:
     import qubesadmin
     import qubesadmin.events.utils
@@ -223,7 +222,6 @@ except ImportError:
 from jinja2 import Template
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.common.text.converters import to_native
-
 
 ALL_COMMANDS = []
 VM_COMMANDS = [

@@ -97,4 +97,6 @@ def test_gather_template_vm_disabled(vm):
 def test_gather_template_vm_appvm(vm):
     res = run_module({"name": vm.name, "gather_template_vm": True})
     assert "template_vm" in res["ansible_facts"]["qubes_facts"]
-    assert res["ansible_facts"]["qubes_facts"]["template_vm"] == vm.template.name
+    assert (
+        res["ansible_facts"]["qubes_facts"]["template_vm"] == vm.template.name
+    )

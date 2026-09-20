@@ -18,7 +18,6 @@
 
 from __future__ import absolute_import, division, print_function
 
-
 __metaclass__ = type
 
 DOCUMENTATION = r"""
@@ -137,7 +136,6 @@ import os
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.common.locale import get_best_parsable_locale
-
 
 ARGUMENT_SPEC = dict(
     force_xen_upgrade=dict(type="bool", default=False),

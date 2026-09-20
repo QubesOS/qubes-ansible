@@ -26,7 +26,6 @@ from ansible_collections.qubesos.security.plugins.strategy.qubes_proxy import (
 
 from unittest.mock import Mock
 
-
 PLUGIN_PATH = Path(__file__).parent.parent / "plugins" / "modules"
 
 
