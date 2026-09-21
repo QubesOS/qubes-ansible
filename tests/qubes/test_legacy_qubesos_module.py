@@ -1209,7 +1209,10 @@ def test_create_vm_which_is_its_self_dispvm(vmname, request, qubes):
         {
             "state": "present",
             "name": vmname,
-            "properties": {"default_dispvm": vmname},
+            "properties": {
+                "template_for_dispvms": True,
+                "default_dispvm": vmname,
+            },
         }
     )
 
