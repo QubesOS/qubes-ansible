@@ -25,7 +25,6 @@ from ansible.module_utils import basic
 from ansible.module_utils.common.text.converters import to_bytes
 from unittest.mock import MagicMock, patch
 
-
 _libdnf5 = MagicMock()
 sys.modules["libdnf5"] = _libdnf5
 sys.modules["libdnf5.base"] = _libdnf5

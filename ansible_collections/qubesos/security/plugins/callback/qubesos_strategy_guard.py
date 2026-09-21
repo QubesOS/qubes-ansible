@@ -20,7 +20,6 @@ import sys
 
 from ansible.plugins.callback import CallbackBase
 
-
 DOCUMENTATION = r"""
 name: qubesos_strategy_guard
 type: aggregate

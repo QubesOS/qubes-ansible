@@ -49,7 +49,6 @@ from ansible.plugins.vars.host_group_vars import VarsModule
 from ansible.parsing.dataloader import DataLoader
 from ansible.parsing.yaml.dumper import AnsibleDumper
 
-
 DOCUMENTATION = r"""
 ---
 name: qubes
@@ -508,7 +507,7 @@ class QubesPlayExecutor:
                 + "\n"
             ).encode()
             self.vvvv(f"RPC args: {rpc_args}")
-            (untrusted_stdout, untrusted_stderr) = p.communicate(rpc_args)
+            untrusted_stdout, untrusted_stderr = p.communicate(rpc_args)
             self.vvvv(f"stdout: {untrusted_stdout}")
             self.vvvv(f"stderr: {untrusted_stderr}")
             self.vvvv(f"return code: {p.returncode}")

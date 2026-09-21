@@ -17,7 +17,6 @@ from tests.qubes.ansible_test_utils import (
 from pathlib import Path
 from typing import List
 
-
 DEBIAN_TEMPLATE = "debian-12-minimal"
 PLUGIN_PATH = Path(__file__).parent / "plugins" / "modules"
 
