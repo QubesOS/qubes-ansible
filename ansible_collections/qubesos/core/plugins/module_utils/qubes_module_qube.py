@@ -301,7 +301,15 @@ class QubeModule:
         before = {}
         after = {}
 
-        for property_name, property_val in self.wants.properties.items():
+        properties = self.wants.properties.items()
+        # if going to set default_dispvm to itself, ensure template_for_dispvms
+        # is set first
+        if self.wants.properties.get("default_dispvm", None) == self.qube:
+            properties = sorted(
+                self.wants.properties.items(),
+                key=lambda a: a[0] != "template_for_dispvms",
+            )
+        for property_name, property_val in properties:
             try:
                 if self.qube.property_is_default(property_name):
                     if property_val == "*default*":
