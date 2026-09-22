@@ -82,7 +82,6 @@ class CallbackModule(CallbackBase):
             host=host,
             task=task,
             include_hostvars=True,
-            include_delegate_to=True,
         ).get("ansible_connection", task.connection)
 
         if current_connection == "qubes":
