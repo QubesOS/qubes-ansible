@@ -29,6 +29,12 @@ description:
 
 version_added: "1.0.0"
 
+options:
+    gather_template_vm:
+        description: Retrieve the TemplateVM name of the qube (useful for AppVMs and DispVMs).
+        required: false
+        type: bool
+
 requirements:
   - qubesadmin
 """
@@ -76,6 +82,10 @@ ansible_facts:
                     description: The qube tags
                     type: list
                     returned: always
+                template_vm:
+                    description: For AppVMs and DispVM, the TemplateVM name. For other classes, the qube name. Use it to know where to install persistent apps.
+                    type: str
+                    returned: when gather_template_vm is set
                 volumes:
                     description: The qube volumes
                     type: list
@@ -135,6 +145,12 @@ VOLUME_ITEMS = (
 )
 
 
+def gather_template_vm(qube):
+    if qube.klass in ["AppVM", "DispVM"]:
+        return gather_template_vm(qube.template)
+    return qube.name
+
+
 def get_qube_properties(qube):
     props = {}
     default_props = {}
@@ -171,31 +187,34 @@ def core(module):
         module.fail_json(msg=f"Qube {e} not found")
 
     props, default_props = get_qube_properties(qube)
+    facts = {
+        "qubes_facts": {
+            "name": qube.name,
+            "state": qube.get_power_state().lower(),
+            "properties": props,
+            "default_properties": default_props,
+            "features": {feat: qube.features[feat] for feat in qube.features},
+            "notes": qube.get_notes(),
+            "services": {
+                feat[len("service.") :]: bool(qube.features[feat])
+                for feat in qube.features
+                if feat.startswith("service.")
+            },
+            "tags": list(qube.tags),
+            "volumes": [
+                {item: getattr(vol, item) for item in VOLUME_ITEMS}
+                for vol in qube.volumes.values()
+            ],
+            **get_qube_devices(app, qube),
+        },
+    }
+
+    if module.params.get("gather_template_vm", False):
+        facts["qubes_facts"]["template_vm"] = gather_template_vm(qube)
+
     module.exit_json(
         changed=False,
-        ansible_facts={
-            "qubes_facts": {
-                "name": qube.name,
-                "state": qube.get_power_state().lower(),
-                "properties": props,
-                "default_properties": default_props,
-                "features": {
-                    feat: qube.features[feat] for feat in qube.features
-                },
-                "notes": qube.get_notes(),
-                "services": {
-                    feat[len("service.") :]: bool(qube.features[feat])
-                    for feat in qube.features
-                    if feat.startswith("service.")
-                },
-                "tags": list(qube.tags),
-                "volumes": [
-                    {item: getattr(vol, item) for item in VOLUME_ITEMS}
-                    for vol in qube.volumes.values()
-                ],
-                **get_qube_devices(app, qube),
-            },
-        },
+        ansible_facts=facts,
     )
 
 
@@ -203,6 +222,7 @@ def main():
     module = AnsibleModule(
         argument_spec=dict(
             name=dict(required=True, type="str"),
+            gather_template_vm=dict(type="bool", default=False),
         )
     )
 
