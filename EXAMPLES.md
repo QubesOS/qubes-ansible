@@ -65,7 +65,7 @@ This is the preferred method to create a new qube if it is not already present.
 ## Creating multiple qubes with custom properties and tags
 
 The following example demonstrates creating multiple qubes with specific labels,
-templates, properties, and a policy file for inter-qube communication.
+templates, properties, and a policy file for inter-qube communication. Notice that the 'label' of the qube is now set as a property - in earlier versions it was a parameter.
 
 ```yaml
 ---
@@ -76,9 +76,9 @@ templates, properties, and a policy file for inter-qube communication.
         qubesos.core.qube:
           name: vault-demo
           state: present
-          label: black
           template: "fedora-41-xfce"
           properties:
+            label: black
             memory: 600
             maxmem: 800
             netvm: ""
@@ -87,15 +87,19 @@ templates, properties, and a policy file for inter-qube communication.
         qubesos.core.qube:
           name: work-demo
           state: present
-          label: blue
           template: "fedora-41-xfce"
+          properties:
+            label: blue
+
 
       - name: Create project-demo qube using a template
         qubesos.core.qube:
           name: project-demo
           state: present
-          label: orange
           template: "fedora-41-xfce"
+          properties:
+            label: orange
+
 
       - name: Create policy file for qube communications
         ansible.builtin.copy:
