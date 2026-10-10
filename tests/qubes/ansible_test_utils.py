@@ -46,6 +46,8 @@ def fail_json(*args, **kwargs):
 
 def set_module_args(args):
     basic._ANSIBLE_ARGS = to_bytes(json.dumps({"ANSIBLE_MODULE_ARGS": args}))
+    if hasattr(basic, "_ANSIBLE_PROFILE"):
+        basic._ANSIBLE_PROFILE = "legacy"
 
 
 def run_patched_module(args, module):

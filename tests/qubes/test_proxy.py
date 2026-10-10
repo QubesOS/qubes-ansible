@@ -1,3 +1,5 @@
+import inspect
+
 import pytest
 import shutil
 import subprocess
@@ -56,6 +58,25 @@ class ResultsCollectorJSONCallback(CallbackBase):
         self.host_failed[host.get_name()] = result
 
 
+def create_task_queue_manager(inventory, variable_manager, loader, results_callback):
+    """Create a TaskQueueManager compatible with supported Ansible versions."""
+    common_args = {
+        "inventory": inventory,
+        "variable_manager": variable_manager,
+        "loader": loader,
+        "passwords": {},
+    }
+    if "stdout_callback_name" not in inspect.signature(TaskQueueManager).parameters:
+        return TaskQueueManager(**common_args, stdout_callback=results_callback)
+
+    # Ansible Core 2.20 accepts a callback name only. Preloading the test
+    # callback also prevents the default callback from being loaded.
+    results_callback._init_callback_methods()
+    tqm = TaskQueueManager(**common_args, stdout_callback_name="default")
+    tqm._callback_plugins.append(results_callback)
+    return tqm
+
+
 @pytest.fixture
 def ansible_mock(monkeypatch):
     class AnsibleMock:
@@ -83,13 +104,11 @@ def ansible_mock(monkeypatch):
             self.variable_manager = VariableManager(
                 loader=self.loader, inventory=self.inventory
             )
-            self.tqm = TaskQueueManager(
-                inventory=self.inventory,
-                variable_manager=self.variable_manager,
-                loader=self.loader,
-                passwords={},
-                stdout_callback=self.results_callback,
-                # Use our custom callback instead of the ``default`` callback plugin, which prints to stdout
+            self.tqm = create_task_queue_manager(
+                self.inventory,
+                self.variable_manager,
+                self.loader,
+                self.results_callback,
             )
 
             # required to be set for strategy_loader
@@ -635,13 +654,8 @@ def test_executor_loader_comes_from_variable_manager(monkeypatch, vm):
 
     inventory = InventoryManager(loader=loader, sources=sources)
     variable_manager = VariableManager(loader=loader, inventory=inventory)
-    tqm = TaskQueueManager(
-        inventory=inventory,
-        variable_manager=variable_manager,
-        loader=loader,
-        passwords={},
-        stdout_callback=results_callback,
-        # Use our custom callback instead of the ``default`` callback plugin, which prints to stdout
+    tqm = create_task_queue_manager(
+        inventory, variable_manager, loader, results_callback
     )
 
     # required to be set for strategy_loader

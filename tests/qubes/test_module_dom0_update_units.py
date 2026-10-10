@@ -50,6 +50,8 @@ def set_module_args(args) -> None:
     (https://docs.ansible.com/projects/ansible/latest/dev_guide/testing_units_modules.html)
     """
     basic._ANSIBLE_ARGS = to_bytes(json.dumps({"ANSIBLE_MODULE_ARGS": args}))
+    if hasattr(basic, "_ANSIBLE_PROFILE"):
+        basic._ANSIBLE_PROFILE = "legacy"
 
 
 class AnsibleExitJson(Exception):

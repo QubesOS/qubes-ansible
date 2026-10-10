@@ -50,7 +50,7 @@ r4.3:mgmtvm:
     - $CI_PROJECT_DIR/ci/install_mgmtvm.sh
   script:
     # run ansible's tests
-    - qvm-run -p -u root mgmtvm 'cd /usr/share/ansible ; coverage run --data-file=/root/.coverage --include=plugins/modules/qubesos.py,plugins/connection/qubes.py -m pytest -vvv tests/qubes/'
+    - qvm-run -p -u root mgmtvm 'cd /usr/share/ansible ; PYTHONPATH=. coverage run --data-file=/root/.coverage --include=plugins/modules/qubesos.py,plugins/connection/qubes.py -m pytest -vvv tests/qubes/'
 
 pages:
   stage: build
