@@ -58,7 +58,9 @@ class ResultsCollectorJSONCallback(CallbackBase):
         self.host_failed[host.get_name()] = result
 
 
-def create_task_queue_manager(inventory, variable_manager, loader, results_callback):
+def create_task_queue_manager(
+    inventory, variable_manager, loader, results_callback
+):
     """Create a TaskQueueManager compatible with supported Ansible versions."""
     common_args = {
         "inventory": inventory,
@@ -66,8 +68,13 @@ def create_task_queue_manager(inventory, variable_manager, loader, results_callb
         "loader": loader,
         "passwords": {},
     }
-    if "stdout_callback_name" not in inspect.signature(TaskQueueManager).parameters:
-        return TaskQueueManager(**common_args, stdout_callback=results_callback)
+    if (
+        "stdout_callback_name"
+        not in inspect.signature(TaskQueueManager).parameters
+    ):
+        return TaskQueueManager(
+            **common_args, stdout_callback=results_callback
+        )
 
     # Ansible Core 2.20 accepts a callback name only. Preloading the test
     # callback also prevents the default callback from being loaded.
@@ -111,8 +118,13 @@ def ansible_mock(monkeypatch):
                 self.results_callback,
             )
 
-            # required to be set for strategy_loader
-            self.tqm._workers = None
+            # Older Ansible releases require this for strategy_loader. Newer
+            # releases initialize it as a mutable list for worker processes.
+            if (
+                "stdout_callback_name"
+                not in inspect.signature(TaskQueueManager).parameters
+            ):
+                self.tqm._workers = None
 
             # Mock proxy_run of qubes_proxy strategy
             self.proxy_runs = {}
@@ -658,8 +670,13 @@ def test_executor_loader_comes_from_variable_manager(monkeypatch, vm):
         inventory, variable_manager, loader, results_callback
     )
 
-    # required to be set for strategy_loader
-    tqm._workers = None
+    # Older Ansible releases require this for strategy_loader. Newer releases
+    # initialize it as a mutable list for worker processes.
+    if (
+        "stdout_callback_name"
+        not in inspect.signature(TaskQueueManager).parameters
+    ):
+        tqm._workers = None
 
     import sys
 
