@@ -72,9 +72,7 @@ def create_task_queue_manager(
         "stdout_callback_name"
         not in inspect.signature(TaskQueueManager).parameters
     ):
-        return TaskQueueManager(
-            **common_args, stdout_callback=results_callback
-        )
+        return TaskQueueManager(**common_args, stdout_callback=results_callback)
 
     # Ansible Core 2.20 accepts a callback name only. Preloading the test
     # callback also prevents the default callback from being loaded.
@@ -271,7 +269,13 @@ def test_proxy_with_simple_local_playbook_dom0(run_playbook):
 
 
 def test_proxy_with_target_appvm(run_playbook, vm):
-    playbook = [{"hosts": vm.name, "tasks": [{"debug": {"msg": "foo"}}]}]
+    playbook = [
+        {
+            "hosts": vm.name,
+            "gather_facts": False,
+            "tasks": [{"debug": {"msg": "foo"}}],
+        }
+    ]
 
     inventory = {"appvms": [[vm.name]]}
 
@@ -286,6 +290,7 @@ def test_proxy_with_variables(run_playbook, vm):
     playbook = [
         {
             "hosts": vm.name,
+            "gather_facts": False,
             "tasks": [
                 {
                     "fail": {"msg": "undefined var {{ item }}"},
@@ -327,6 +332,7 @@ def test_proxy_with_dynamic_inventory(run_playbook, vm):
         },
         {
             "hosts": vm.name,
+            "gather_facts": False,
             "tasks": [
                 {
                     "fail": {"msg": "undefined var {{ item }}"},
@@ -385,6 +391,7 @@ def test_proxy_with_mixed_variables_sources(run_playbook, vm):
     playbook = [
         {
             "hosts": vm.name,
+            "gather_facts": False,
             "tasks": [
                 {
                     "fail": {"msg": "undefined var {{ item }}"},
@@ -437,6 +444,7 @@ def test_proxy_yaml_inventory(run_playbook, vm):
     playbook = [
         {
             "hosts": "appvms",
+            "gather_facts": False,
             "tasks": [
                 {
                     "fail": {"msg": "undefined var {{ item }}"},
@@ -471,6 +479,7 @@ def test_proxy_with_dict_in_variable(run_playbook, vm):
     playbook = [
         {
             "hosts": "appvms",
+            "gather_facts": False,
             "tasks": [
                 {
                     "assert": {
@@ -750,6 +759,7 @@ def test_proxy_with_vault_variable(run_playbook, vm, tmp_path):
     playbook = [
         {
             "hosts": vm.name,
+            "gather_facts": False,
             "tasks": [
                 {
                     "fail": {"msg": "undefined var {{ item }}"},

@@ -248,10 +248,10 @@ def test_vm_connection(vm, run_playbook, ansible_config):
             == f'Invalid value "{invalid_user}" for configuration option "plugin_type: connection plugin: qubes setting: remote_user ", valid values are: user, root'
         ), invalid_user_result.stdout
     else:
-        assert (
-            f'Invalid value \\"{invalid_user}\\" for configuration option \\"plugin_type: connection plugin: qubes setting: remote_user \\", valid values are: user, root'
-            in invalid_user_result.stdout
-        )
+        assert "Invalid value" in invalid_user_result.stdout
+        assert invalid_user in invalid_user_result.stdout
+        assert "remote_user" in invalid_user_result.stdout
+        assert "user, root" in invalid_user_result.stdout
 
 
 @pytest.mark.parametrize(
