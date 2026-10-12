@@ -536,6 +536,7 @@ def test_guard_callback_warning(run_playbook, vm):
     playbook = [
         {
             "hosts": vm.name,
+            "gather_facts": False,
             "strategy": "linear",
             "connection": "qubes",
             "tasks": [
@@ -566,6 +567,7 @@ def test_guard_callback_quiet(run_playbook, vm):
     playbook = [
         {
             "hosts": vm.name,
+            "gather_facts": False,
             "strategy": "linear",
             "connection": "qubes",
             "tasks": [
