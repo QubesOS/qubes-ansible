@@ -241,7 +241,13 @@ def run_playbook(tmp_path):
 
 
 def test_proxy_with_simple_local_playbook(run_playbook):
-    playbook = [{"hosts": "localhost", "tasks": [{"debug": {"msg": "foo"}}]}]
+    playbook = [
+        {
+            "hosts": "localhost",
+            "gather_facts": False,
+            "tasks": [{"debug": {"msg": "foo"}}],
+        }
+    ]
     result = run_playbook(playbook)
     assert result.returncode == 0, result.stderr
     assert (
@@ -250,7 +256,13 @@ def test_proxy_with_simple_local_playbook(run_playbook):
 
 
 def test_proxy_with_simple_local_playbook_dom0(run_playbook):
-    playbook = [{"hosts": "dom0", "tasks": [{"debug": {"msg": "foo"}}]}]
+    playbook = [
+        {
+            "hosts": "dom0",
+            "gather_facts": False,
+            "tasks": [{"debug": {"msg": "foo"}}],
+        }
+    ]
     result = run_playbook(
         playbook,
         inventory={

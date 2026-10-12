@@ -22,6 +22,7 @@ def test_create_and_destroy_vm(run_playbook, request, target_host):
     playbook = [
         {
             "hosts": target_host,
+            "gather_facts": False,
             "tasks": [
                 {
                     "name": "Create AppVM",
@@ -68,6 +69,7 @@ def test_properties_and_tags_playbook(run_playbook, request, target_host):
     playbook = [
         {
             "hosts": target_host,
+            "gather_facts": False,
             "tasks": [
                 {
                     "name": "Create VM with properties",
@@ -94,11 +96,11 @@ def test_properties_and_tags_playbook(run_playbook, request, target_host):
 
     # Ensure properties and tags were applied
     run_output = json.loads(result.stdout)
-    assert run_output["plays"][0]["tasks"][1]["hosts"][target_host][
+    assert run_output["plays"][0]["tasks"][0]["hosts"][target_host][
         "changed"
     ], result.stdout
     assert {"tag1", "tag2"} == set(
-        run_output["plays"][0]["tasks"][1]["hosts"][target_host]["diff"][
+        run_output["plays"][0]["tasks"][0]["hosts"][target_host]["diff"][
             "after"
         ]["tags"]
     ), result.stdout
@@ -116,6 +118,7 @@ def test_inventory_playbook(run_playbook, tmp_path, qubes, target_host):
     playbook = [
         {
             "hosts": target_host,
+            "gather_facts": False,
             "tasks": [
                 {
                     "name": "Create inventory",
