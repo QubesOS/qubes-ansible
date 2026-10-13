@@ -182,7 +182,7 @@ class QubesDom0UpdateModule:
         return self.module.run_command(["/usr/bin/qubes-dom0-update", *opts])
 
     def _get_dnf_opts(self):
-        args = ["-y"]
+        args = ["--yes"]
         if self.force_xen_upgrade:
             args.append("--force-xen-upgrade")
         if self.skip_boot_check:
