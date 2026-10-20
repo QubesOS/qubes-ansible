@@ -54,7 +54,7 @@ r4.3:mgmtvm:
 
 pages:
   stage: build
-  image: python:3
+  image: python:3.14
   tags:
     - docker
   artifacts:
