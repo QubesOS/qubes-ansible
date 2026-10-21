@@ -246,9 +246,9 @@ def test_vm_connection(vm, run_playbook, ansible_config):
 
     if ansible_config == "ansible_linear_strategy":
         invalid_user_output = json.loads(invalid_user_result.stdout)
-        invalid_user_message = invalid_user_output["plays"][0]["tasks"][0]["hosts"][
-            vm.name
-        ]["msg"]
+        invalid_user_message = invalid_user_output["plays"][0]["tasks"][0][
+            "hosts"
+        ][vm.name]["msg"]
         assert "Invalid value" in invalid_user_message
         assert invalid_user in invalid_user_message
         assert "remote_user" in invalid_user_message
