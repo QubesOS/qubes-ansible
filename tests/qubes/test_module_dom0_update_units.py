@@ -16,13 +16,13 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import json
+from contextlib import ExitStack
 import sys
 import pytest
 
 
 from ansible.module_utils import basic
-from ansible.module_utils.common.text.converters import to_bytes
+from ansible.module_utils.testing import patch_module_args
 from unittest.mock import MagicMock, patch
 
 _libdnf5 = MagicMock()
@@ -45,13 +45,14 @@ from ansible_collections.qubesos.core.plugins.modules.qubes_dom0_update import (
 # ---------------------------------------------------------------------------
 
 
+_module_args_stack = None
+
+
 def set_module_args(args) -> None:
     """prepare arguments so that they will be picked up during module creation
     (https://docs.ansible.com/projects/ansible/latest/dev_guide/testing_units_modules.html)
     """
-    basic._ANSIBLE_ARGS = to_bytes(json.dumps({"ANSIBLE_MODULE_ARGS": args}))
-    if hasattr(basic, "_ANSIBLE_PROFILE"):
-        basic._ANSIBLE_PROFILE = "legacy"
+    _module_args_stack.enter_context(patch_module_args(args))
 
 
 class AnsibleExitJson(Exception):
@@ -91,8 +92,9 @@ def init_module(params=None) -> QubesDom0UpdateModule:
 
 @pytest.fixture(autouse=True)
 def setup():
+    global _module_args_stack
     _libdnf5.reset_mock()
-    with patch.multiple(
+    with ExitStack() as stack, patch.multiple(
         basic.AnsibleModule, exit_json=exit_json, fail_json=fail_json
     ), patch("os.geteuid", return_value=0), patch(
         "ansible_collections.qubesos.core.plugins.modules.qubes_dom0_update.get_best_parsable_locale",
@@ -100,7 +102,9 @@ def setup():
     ), patch.dict(
         "os.environ", {}, clear=False
     ):
+        _module_args_stack = stack
         yield
+        _module_args_stack = None
 
 
 # ---------------------------------------------------------------------------
