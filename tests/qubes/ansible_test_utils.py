@@ -1,7 +1,7 @@
 from unittest.mock import patch
 
 from ansible.module_utils import basic
-from ansible.module_utils.testing import patch_module_args
+from tests.qubes.ansible_module_test_utils import patch_module_args
 
 from plugins.modules.qubesos import (
     main as qubesos_legacy_main,

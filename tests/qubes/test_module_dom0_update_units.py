@@ -22,7 +22,7 @@ import pytest
 
 
 from ansible.module_utils import basic
-from ansible.module_utils.testing import patch_module_args
+from tests.qubes.ansible_module_test_utils import patch_module_args
 from unittest.mock import MagicMock, patch
 
 _libdnf5 = MagicMock()
@@ -52,6 +52,7 @@ def set_module_args(args) -> None:
     """prepare arguments so that they will be picked up during module creation
     (https://docs.ansible.com/projects/ansible/latest/dev_guide/testing_units_modules.html)
     """
+    assert _module_args_stack is not None
     _module_args_stack.enter_context(patch_module_args(args))
 
 
