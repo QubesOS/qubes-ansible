@@ -50,11 +50,16 @@ r4.3:mgmtvm:
     - $CI_PROJECT_DIR/ci/install_mgmtvm.sh
   script:
     # run ansible's tests
-    - qvm-run -p -u root mgmtvm 'cd /usr/share/ansible ; coverage run --data-file=/root/.coverage --include=plugins/modules/qubesos.py,plugins/connection/qubes.py -m pytest -vvv tests/qubes/'
+    - qvm-run -p -u root mgmtvm 'cd /usr/share/ansible ; PYTHONPATH=. coverage run --data-file=/root/.coverage --include=plugins/modules/qubesos.py,plugins/connection/qubes.py -m pytest -vvv tests/qubes/'
+  after_script:
+    # qrexec exit status 125 alone does not identify the transport failure.
+    - if [ "$CI_JOB_STATUS" = failed ]; then sudo journalctl -b --no-pager -u qubes-qrexec-policy-daemon.service -u qubes-qrexec@mgmtvm.service || true; fi
+    - if [ "$CI_JOB_STATUS" = failed ]; then qvm-run -p -u root mgmtvm 'journalctl -b --no-pager -u qubes-qrexec-agent.service' || true; fi
+    - ci/codecov-wrapper -F unittests
 
 pages:
   stage: build
-  image: python:3
+  image: python:3.14
   tags:
     - docker
   artifacts:
