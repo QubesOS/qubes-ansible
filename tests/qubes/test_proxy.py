@@ -340,6 +340,7 @@ def test_proxy_with_dynamic_inventory(run_playbook, vm):
     playbook = [
         {
             "hosts": "localhost",
+            "gather_facts": False,
             "tasks": [{"add_host": {"name": vm.name, "group": "my_group"}}],
         },
         {
