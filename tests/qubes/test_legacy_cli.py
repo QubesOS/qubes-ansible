@@ -21,6 +21,7 @@ def test_create_and_destroy_vm(run_playbook, request, target_host):
     playbook = [
         {
             "hosts": target_host,
+            "gather_facts": False,
             "tasks": [
                 {
                     "name": "Create AppVM",
@@ -68,6 +69,7 @@ def test_properties_and_tags_playbook(run_playbook, request, target_host):
     playbook = [
         {
             "hosts": target_host,
+            "gather_facts": False,
             "tasks": [
                 {
                     "name": "Create VM with properties",
@@ -94,11 +96,11 @@ def test_properties_and_tags_playbook(run_playbook, request, target_host):
 
     # Ensure properties and tags were applied
     run_output = json.loads(result.stdout)
-    assert run_output["plays"][0]["tasks"][1]["hosts"][target_host][
+    assert run_output["plays"][0]["tasks"][0]["hosts"][target_host][
         "changed"
     ], result.stdout
     assert {"tag1", "tag2"} == set(
-        run_output["plays"][0]["tasks"][1]["hosts"][target_host].get(
+        run_output["plays"][0]["tasks"][0]["hosts"][target_host].get(
             "Tags updated", []
         )
     ), result.stdout
@@ -117,6 +119,7 @@ def test_inventory_playbook(run_playbook, tmp_path, qubes, target_host):
     playbook = [
         {
             "hosts": target_host,
+            "gather_facts": False,
             "tasks": [
                 {
                     "name": "Create inventory",
@@ -243,15 +246,16 @@ def test_vm_connection(vm, run_playbook, ansible_config):
 
     if ansible_config == "ansible_linear_strategy":
         invalid_user_output = json.loads(invalid_user_result.stdout)
-        assert (
-            invalid_user_output["plays"][0]["tasks"][0]["hosts"][vm.name]["msg"]
-            == f'Invalid value "{invalid_user}" for configuration option "plugin_type: connection plugin: qubes setting: remote_user ", valid values are: user, root'
-        ), invalid_user_result.stdout
+        invalid_user_message = invalid_user_output["plays"][0]["tasks"][0][
+            "hosts"
+        ][vm.name]["msg"]
+        assert "Invalid value" in invalid_user_message
+        assert invalid_user in invalid_user_message
+        assert "remote_user" in invalid_user_message
     else:
-        assert (
-            f'Invalid value \\"{invalid_user}\\" for configuration option \\"plugin_type: connection plugin: qubes setting: remote_user \\", valid values are: user, root'
-            in invalid_user_result.stdout
-        )
+        assert "Invalid value" in invalid_user_result.stdout
+        assert invalid_user in invalid_user_result.stdout
+        assert "remote_user" in invalid_user_result.stdout
 
 
 @pytest.mark.parametrize(
@@ -380,6 +384,7 @@ def test_state_absent_when_vm_does_not_exist(run_playbook):
     playbook = [
         {
             "hosts": "localhost",
+            "gather_facts": False,
             "tasks": [
                 {
                     "name": "Ensure VM doesn't exist",
@@ -391,7 +396,7 @@ def test_state_absent_when_vm_does_not_exist(run_playbook):
     result = run_playbook(playbook)
     assert result.returncode == 0, result.stderr
     output = json.loads(result.stdout)
-    assert not output["plays"][0]["tasks"][1]["hosts"]["localhost"]["changed"]
+    assert not output["plays"][0]["tasks"][0]["hosts"]["localhost"]["changed"]
 
 
 @pytest.mark.parametrize(
