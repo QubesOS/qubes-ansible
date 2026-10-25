@@ -379,7 +379,17 @@ class QubesPlayExecutor:
                 service_with_arg,
             ]
 
-        return subprocess.check_output(command, env=env).decode()
+        p = subprocess.run(
+            command, env=env, stdin=subprocess.DEVNULL, capture_output=True
+        )
+        stdout = p.stdout.decode("utf-8")
+        stderr = p.stderr.decode("utf-8")
+        if p.returncode != 0:
+            raise RuntimeError(
+                f"{service_with_arg} failed (exit {p.returncode})\n"
+                f"stdout: {stdout}\nstderr: {stderr}"
+            )
+        return stdout
 
     def _build_ansible_args(self):
         args = []
