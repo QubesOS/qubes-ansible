@@ -241,13 +241,7 @@ def run_playbook(tmp_path):
 
 
 def test_proxy_with_simple_local_playbook(run_playbook):
-    playbook = [
-        {
-            "hosts": "localhost",
-            "gather_facts": False,
-            "tasks": [{"debug": {"msg": "foo"}}],
-        }
-    ]
+    playbook = [{"hosts": "localhost", "tasks": [{"debug": {"msg": "foo"}}]}]
     result = run_playbook(playbook)
     assert result.returncode == 0, result.stderr
     assert (
@@ -256,13 +250,7 @@ def test_proxy_with_simple_local_playbook(run_playbook):
 
 
 def test_proxy_with_simple_local_playbook_dom0(run_playbook):
-    playbook = [
-        {
-            "hosts": "dom0",
-            "gather_facts": False,
-            "tasks": [{"debug": {"msg": "foo"}}],
-        }
-    ]
+    playbook = [{"hosts": "dom0", "tasks": [{"debug": {"msg": "foo"}}]}]
     result = run_playbook(
         playbook,
         inventory={
@@ -281,13 +269,7 @@ def test_proxy_with_simple_local_playbook_dom0(run_playbook):
 
 
 def test_proxy_with_target_appvm(run_playbook, vm):
-    playbook = [
-        {
-            "hosts": vm.name,
-            "gather_facts": False,
-            "tasks": [{"debug": {"msg": "foo"}}],
-        }
-    ]
+    playbook = [{"hosts": vm.name, "tasks": [{"debug": {"msg": "foo"}}]}]
 
     inventory = {"appvms": [[vm.name]]}
 
@@ -302,7 +284,6 @@ def test_proxy_with_variables(run_playbook, vm):
     playbook = [
         {
             "hosts": vm.name,
-            "gather_facts": False,
             "tasks": [
                 {
                     "fail": {"msg": "undefined var {{ item }}"},
@@ -344,7 +325,6 @@ def test_proxy_with_dynamic_inventory(run_playbook, vm):
         },
         {
             "hosts": vm.name,
-            "gather_facts": False,
             "tasks": [
                 {
                     "fail": {"msg": "undefined var {{ item }}"},
@@ -403,7 +383,6 @@ def test_proxy_with_mixed_variables_sources(run_playbook, vm):
     playbook = [
         {
             "hosts": vm.name,
-            "gather_facts": False,
             "tasks": [
                 {
                     "fail": {"msg": "undefined var {{ item }}"},
@@ -456,7 +435,6 @@ def test_proxy_yaml_inventory(run_playbook, vm):
     playbook = [
         {
             "hosts": "appvms",
-            "gather_facts": False,
             "tasks": [
                 {
                     "fail": {"msg": "undefined var {{ item }}"},
@@ -491,7 +469,6 @@ def test_proxy_with_dict_in_variable(run_playbook, vm):
     playbook = [
         {
             "hosts": "appvms",
-            "gather_facts": False,
             "tasks": [
                 {
                     "assert": {
@@ -548,7 +525,6 @@ def test_guard_callback_warning(run_playbook, vm):
     playbook = [
         {
             "hosts": vm.name,
-            "gather_facts": False,
             "strategy": "linear",
             "connection": "qubes",
             "tasks": [
@@ -579,7 +555,6 @@ def test_guard_callback_quiet(run_playbook, vm):
     playbook = [
         {
             "hosts": vm.name,
-            "gather_facts": False,
             "strategy": "linear",
             "connection": "qubes",
             "tasks": [
@@ -773,7 +748,6 @@ def test_proxy_with_vault_variable(run_playbook, vm, tmp_path):
     playbook = [
         {
             "hosts": vm.name,
-            "gather_facts": False,
             "tasks": [
                 {
                     "fail": {"msg": "undefined var {{ item }}"},
