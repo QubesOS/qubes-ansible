@@ -18,6 +18,7 @@ lint:
     - vm-kvm
 
   before_script: &install_qubes_ansible
+    - $CI_PROJECT_DIR/ci/sys_info.sh
     # install dependencies
     - sudo qubes-dom0-update -y --enablerepo=qubes*current-testing
     - sudo qubes-dom0-update -y ansible python3-pytest python3-coverage perl-Digest-SHA sequoia-sqv
@@ -50,11 +51,11 @@ r4.3:mgmtvm:
     - $CI_PROJECT_DIR/ci/install_mgmtvm.sh
   script:
     # run ansible's tests
-    - qvm-run -p -u root mgmtvm 'cd /usr/share/ansible ; coverage run --data-file=/root/.coverage --include=plugins/modules/qubesos.py,plugins/connection/qubes.py -m pytest -vvv tests/qubes/'
+    - qvm-run -p -u root mgmtvm 'cd /usr/share/ansible ; PYTHONPATH=. coverage run --data-file=/root/.coverage --include=plugins/modules/qubesos.py,plugins/connection/qubes.py -m pytest -vvv tests/qubes/'
 
 pages:
   stage: build
-  image: python:3
+  image: python:3.14
   tags:
     - docker
   artifacts:

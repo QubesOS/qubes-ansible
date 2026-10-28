@@ -7,10 +7,32 @@ function err_ex() {
     exit 1
 }
 
+function latest_debian_template() {
+    python3 - "$1" << 'EOF'
+import re
+import sys
+import qubesadmin
+
+flavor = sys.argv[1]
+templates = [
+    vm.name
+    for vm in qubesadmin.Qubes().domains
+    if vm.klass == "TemplateVM"
+    and re.fullmatch(rf"debian-\d+-{flavor}", vm.name)
+]
+if not templates:
+    sys.exit(f"no debian-*-{flavor} template found")
+print(max(templates, key=lambda name: int(name.split("-")[1])))
+EOF
+}
+
 default_mgmt_dispvm="$(qubes-prefs management_dispvm)"
 default_mgmt_dispvm_template="$(qvm-prefs "$default_mgmt_dispvm" template)"
 [[ "$default_mgmt_dispvm_template" == fedora-* ]] || err_ex "unsupported template $default_mgmt_dispvm_template"
 fedora_ver="$(echo "$default_mgmt_dispvm_template" | cut -d- -f2)"
+
+debian_minimal="$(latest_debian_template minimal)"
+debian_xfce="$(latest_debian_template xfce)"
 
 repo_dir="artifacts/repository/vm-fc${fedora_ver}"
 [[ -d "$repo_dir" ]] || err_ex "'$repo_dir' not found"
@@ -43,7 +65,8 @@ mgmtvm sys-net                allow target=dom0
 mgmtvm sys-firewall           allow target=dom0
 mgmtvm sys-usb                allow target=dom0
 mgmtvm ${default_mgmt_dispvm_template} allow target=dom0
-mgmtvm debian-13-xfce         allow target=dom0
+mgmtvm ${debian_minimal} allow target=dom0
+mgmtvm ${debian_xfce} allow target=dom0
 EOF
 
 cat << EOF >> /etc/qubes/policy.d/include/admin-local-ro
@@ -51,7 +74,8 @@ mgmtvm sys-net                allow target=dom0
 mgmtvm sys-firewall           allow target=dom0
 mgmtvm sys-usb                allow target=dom0
 mgmtvm ${default_mgmt_dispvm_template} allow target=dom0
-mgmtvm debian-13-xfce         allow target=dom0
+mgmtvm ${debian_minimal} allow target=dom0
+mgmtvm ${debian_xfce} allow target=dom0
 EOF
 
 cat << EOF > /etc/qubes/policy.d/30-mgmtvm.policy
@@ -65,7 +89,7 @@ admin.vm.Create.StandaloneVM     * mgmtvm dom0                   allow
 admin.vm.Create.TemplateVM       * mgmtvm dom0                   allow
 
 # You may want to allow the ManagementVM to clone some templates to create StandaloneVMs or new TemplateVMs
-admin.vm.volume.CloneFrom        * mgmtvm debian-13-xfce         allow target=dom0
+admin.vm.volume.CloneFrom        * mgmtvm ${debian_xfce} allow target=dom0
 admin.vm.volume.CloneFrom        * mgmtvm ${default_mgmt_dispvm_template} allow target=dom0
 
 # And to remove created ones

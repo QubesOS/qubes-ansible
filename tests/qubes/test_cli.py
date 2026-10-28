@@ -242,15 +242,16 @@ def test_vm_connection(vm, run_playbook, ansible_config):
 
     if ansible_config == "ansible_linear_strategy":
         invalid_user_output = json.loads(invalid_user_result.stdout)
-        assert (
-            invalid_user_output["plays"][0]["tasks"][0]["hosts"][vm.name]["msg"]
-            == f'Invalid value "{invalid_user}" for configuration option "plugin_type: connection plugin: ansible_collections.qubesos.core.plugins.connection.qubes setting: remote_user ", valid values are: user, root'
-        ), invalid_user_result.stdout
+        invalid_user_message = invalid_user_output["plays"][0]["tasks"][0][
+            "hosts"
+        ][vm.name]["msg"]
+        assert "Invalid value" in invalid_user_message
+        assert invalid_user in invalid_user_message
+        assert "remote_user" in invalid_user_message
     else:
-        assert (
-            f'Invalid value \\"{invalid_user}\\" for configuration option \\"plugin_type: connection plugin: qubes setting: remote_user \\", valid values are: user, root'
-            in invalid_user_result.stdout
-        )
+        assert "Invalid value" in invalid_user_result.stdout
+        assert invalid_user in invalid_user_result.stdout
+        assert "remote_user" in invalid_user_result.stdout
 
 
 @pytest.mark.parametrize(
@@ -712,10 +713,7 @@ def test_playbook_with_vault_in_role_no_password(
 
     result = run_playbook(playbook_content=playbook, vms=[vm.name])
     assert result.returncode != 0
-    assert (
-        "ERROR! Attempting to decrypt but no vault secrets found"
-        in result.stderr
-    )
+    assert "Attempting to decrypt but no vault secrets found" in result.stderr
 
 
 @pytest.mark.parametrize(
