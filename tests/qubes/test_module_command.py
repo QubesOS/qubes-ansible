@@ -165,7 +165,7 @@ def test_create_clone_vmtype_combinations(qubes, vmname, request):
     run_module({"command": "remove", "name": vmname})
 
 
-def test_inventory_generation_and_grouping(tmp_path, qubes):
+def test_inventory_generation_and_grouping(tmp_path, qubes, xfce_template):
     # Use a temporary directory for inventory
     os.chdir(tmp_path)
 
@@ -175,7 +175,7 @@ def test_inventory_generation_and_grouping(tmp_path, qubes):
             "command": "create",
             "name": "teststandalone",
             "vmtype": "StandaloneVM",
-            "template": "debian-13-xfce",
+            "template": xfce_template,
         }
     )
 
