@@ -257,6 +257,7 @@ def test_volumes_list_for_standalonevm(qubes, vmname, request, xfce_template):
         }
     )
     assert rc == VIRT_SUCCESS
+    qubes.domains.refresh_cache(force=True)
     vm = qubes.domains[vmname]
     assert vm.klass == "StandaloneVM"
     assert vm.volumes["root"].size == 32212254720
@@ -288,6 +289,8 @@ def test_inventory_generation_and_grouping(tmp_path, qubes, xfce_template):
             "template": xfce_template,
         }
     )
+
+    qubes.domains.refresh_cache(force=True)
 
     # Collect expected VMs by class
     expected = {}
