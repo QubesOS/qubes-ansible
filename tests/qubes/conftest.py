@@ -1,3 +1,4 @@
+import re
 import subprocess
 import shutil
 import sys
@@ -17,7 +18,6 @@ from tests.qubes.ansible_test_utils import (
 from pathlib import Path
 from typing import List
 
-DEBIAN_TEMPLATE = "debian-12-minimal"
 PLUGIN_PATH = Path(__file__).parent / "plugins" / "modules"
 
 
@@ -48,10 +48,10 @@ def vm(qubes, request):
 
 
 @pytest.fixture(scope="function")
-def minimalvm(qubes, request):
+def minimalvm(qubes, request, minimal_template):
     vmname = f"test-minimalvm-{uuid.uuid4().hex[:8]}"
     run_module(
-        {"state": "present", "name": vmname, "template": DEBIAN_TEMPLATE}
+        {"state": "present", "name": vmname, "template": minimal_template}
     )
     request.node.mark_vm_created(vmname)
 
@@ -218,3 +218,27 @@ def run_playbook(tmp_path, ansible_config):
         return result
 
     return _run
+
+
+def _latest_debian_template(qubes, flavor):
+    templates = [
+        vm.name
+        for vm in qubes.domains
+        if vm.klass == "TemplateVM"
+        and re.fullmatch(rf"debian-\d+-{flavor}", vm.name)
+    ]
+    if not templates:
+        pytest.fail(f"No debian-*-{flavor} template available")
+    return max(templates, key=lambda name: int(name.split("-")[1]))
+
+
+@pytest.fixture(scope="function")
+def minimal_template(qubes):
+    """Return the most recent debian-N-minimal template name"""
+    return _latest_debian_template(qubes, "minimal")
+
+
+@pytest.fixture(scope="function")
+def xfce_template(qubes):
+    """Return the most recent debian-N-xfce template name"""
+    return _latest_debian_template(qubes, "xfce")
