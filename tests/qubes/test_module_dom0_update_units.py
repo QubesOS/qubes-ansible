@@ -119,7 +119,7 @@ def test_call_qubes_dom0_update_default_options():
         basic.AnsibleModule, "run_command", return_value=(0, "", "")
     ) as mock_run:
         m._call_qubes_dom0_update()
-    assert mock_run.call_args[0][0] == ["/usr/bin/qubes-dom0-update", "-y"]
+    assert mock_run.call_args[0][0] == ["/usr/bin/qubes-dom0-update", "--yes"]
 
 
 def test_call_qubes_dom0_opts_force_xen_upgrade():
@@ -130,7 +130,7 @@ def test_call_qubes_dom0_opts_force_xen_upgrade():
         m._call_qubes_dom0_update()
     assert mock_run.call_args[0][0] == [
         "/usr/bin/qubes-dom0-update",
-        "-y",
+        "--yes",
         "--force-xen-upgrade",
     ]
 
@@ -143,7 +143,7 @@ def test_call_qubes_dom0_opts_skip_boot_check():
         m._call_qubes_dom0_update()
     assert mock_run.call_args[0][0] == [
         "/usr/bin/qubes-dom0-update",
-        "-y",
+        "--yes",
         "--skip-boot-check",
     ]
 
@@ -156,7 +156,7 @@ def test_call_qubes_dom0_update_with_options_and_args():
         m._call_qubes_dom0_update(options=["--action=install"], args=["pkg1"])
     cmd = mock_run.call_args[0][0]
     assert cmd[0] == "/usr/bin/qubes-dom0-update"
-    assert "-y" in cmd
+    assert "--yes" in cmd
     assert "--force-xen-upgrade" in cmd
     assert "--action=install" in cmd
     assert "pkg1" in cmd
@@ -253,7 +253,7 @@ def test_process_install_multiple_missing_packages():
     mock_run.assert_called_once()
     assert [
         "/usr/bin/qubes-dom0-update",
-        "-y",
+        "--yes",
         "--action=install",
     ] == mock_run.call_args_list[0].args[0][0:3]
     assert ["pkg1", "pkg2"] == sorted(mock_run.call_args_list[0].args[0][3:])
