@@ -1,8 +1,7 @@
-import json
 from unittest.mock import patch
 
 from ansible.module_utils import basic
-from ansible.module_utils.common.text.converters import to_bytes
+from tests.qubes.ansible_module_test_utils import patch_module_args
 
 from plugins.modules.qubesos import (
     main as qubesos_legacy_main,
@@ -44,14 +43,9 @@ def fail_json(*args, **kwargs):
     raise AnsibleFailJson(kwargs)
 
 
-def set_module_args(args):
-    basic._ANSIBLE_ARGS = to_bytes(json.dumps({"ANSIBLE_MODULE_ARGS": args}))
-
-
 def run_patched_module(args, module):
     """Run the specified module. Returns result dict on success, raises AnsibleFailJson on failure."""
-    set_module_args(args)
-    with patch.multiple(
+    with patch_module_args(args), patch.multiple(
         basic.AnsibleModule, exit_json=exit_json, fail_json=fail_json
     ):
         try:
@@ -79,8 +73,7 @@ def run_module_qubesos_core_qube_facts(args):
 
 def run_module_qubesos_legacy(args):
     """Run the qube module. Returns result dict on success, raises AnsibleFailJson on failure."""
-    set_module_args(args)
-    with patch.multiple(
+    with patch_module_args(args), patch.multiple(
         basic.AnsibleModule, exit_json=exit_json, fail_json=fail_json
     ):
         try:

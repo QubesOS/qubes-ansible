@@ -18,6 +18,7 @@ lint:
     - vm-kvm
 
   before_script: &install_qubes_ansible
+    - $CI_PROJECT_DIR/ci/sys_info.sh
     # install dependencies
     - sudo qubes-dom0-update -y --enablerepo=qubes*current-testing
     - sudo qubes-dom0-update -y ansible python3-pytest python3-coverage perl-Digest-SHA sequoia-sqv
@@ -54,7 +55,7 @@ r4.3:mgmtvm:
 
 pages:
   stage: build
-  image: python:3
+  image: python:3.14
   tags:
     - docker
   artifacts:
